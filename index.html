@@ -128,7 +128,7 @@
     .gname .badge { min-width: 0; padding: 0 4px; font-size: 10px; }
     .gdmg { font-size: 14px; padding: 2px 0 6px; }
     .gclear { top: 2px; right: 2px; padding: 0 5px; font-size: 10px; line-height: 1.6; opacity: .7; }
-    .hint { display: none; }  /* 説明文は隠してスッキリさせる */
+    p.hint { display: none; }  /* 長い説明文は隠す（検索結果内の情報は残す） */
     .row-name { width: 8em; font-size: 12px; }
     .rowicon { width: 21px; height: 21px; }
   }
@@ -416,7 +416,7 @@ $("#searchInput").addEventListener("input", () => {
     div.innerHTML =
       `<img src="${c.u}" alt="" loading="lazy">` +
       `<div style="text-align:left"><div>★${c.r} ${c.n}</div>` +
-      `<div>${main ? colorBadge(main) : ""}${sub ? colorBadge(sub) : ""} <span class="hint">${c.t || ""}${c.a ? `　攻撃${c.a}${c.x ? "（とっくんなし）" : ""}` : ""}</span></div></div>`;
+      `<div>${main ? colorBadge(main) : ""}${sub ? colorBadge(sub) : ""} <span class="hint">${c.t || ""}${c.a ? `　攻撃${c.a}${c.x ? "（とっくんなし）" : ""}` : ""}${c.w ? "　[Wiki]" : ""}</span></div></div>`;
     div.addEventListener("click", () => pickCard(c));
     box.appendChild(div);
   });

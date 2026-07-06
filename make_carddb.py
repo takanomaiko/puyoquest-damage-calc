@@ -193,6 +193,27 @@ def main():
             e["x"] = 1     # とっくん分を含まないLv.MAX値の印
             matched_lv += 1
 
+    # --- Puyo Nexus Wikiから取得したカード（nexus_cards.json）を合体 ---
+    # シートに同じ(名前, レア度)がある場合はシートのデータを優先する
+    nexus_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nexus_cards.json")
+    nexus_added = 0
+    if os.path.exists(nexus_path):
+        with open(nexus_path, encoding="utf-8") as f:
+            nexus = json.load(f)
+        existing = {(norm(e["n"]), e["r"]) for e in entries.values()}
+        for card in nexus:
+            key = (norm(card["n"]), card["r"])
+            if key in existing:
+                continue
+            # ステータスもスキルもないカード（強化素材など）は除外
+            if not (card.get("a") or card.get("ns") or card.get("ls")):
+                continue
+            existing.add(key)
+            entry = {k: v for k, v in card.items() if k != "code"}
+            entries[(card["n"] + "@nexus", card["r"])] = entry
+            nexus_added += 1
+        print(f"Wiki由来のカードを追加: {nexus_added}枚")
+
     cards = sorted(entries.values(), key=lambda e: (e["n"], e["r"]))
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "carddb.js")
     with open(out, "w", encoding="utf-8") as f:
