@@ -416,6 +416,7 @@ function pickCard(c) {
   if (c.a) card.atk = c.a;   // ステDBの攻撃力（とっくん最大値）
   card.ns = c.ns || "";
   card.ls = c.ls || "";
+  card.ail = c.ail || [];   // このカードが敵に付与できる状態異常
   applySkillRows(searchTarget, c);
   closeSearch();
   renderAll();
@@ -484,6 +485,35 @@ function refreshAutoRows() {
       return { m: v, s: v };
     });
   }
+  refreshAilmentRow();
+}
+
+// 状態異常の行（デッキ全体で1行）
+// 複数の状態異常は倍率の高いものだけが適用されるゲーム仕様なので、最大値を入れる
+function refreshAilmentRow() {
+  const all = [];
+  state.cards.forEach((cd) => {
+    (cd.ail || []).forEach((a) => all.push({ ...a, card: cd.name, img: cd.img }));
+  });
+  let row = state.rows.find((r) => r.st);
+  if (all.length === 0) {
+    if (row) state.rows = state.rows.filter((r) => !r.st);
+    return;
+  }
+  const best = all.reduce((a, b) => (b.v > a.v ? b : a));
+  if (!row) {
+    row = { name: "", on: true, st: true, cells: [] };
+    state.rows.push(row);
+  }
+  row.name = `状態異常:${best.k}`;
+  row.info = {
+    card: best.card,
+    img: best.img || "",
+    txt: `このデッキが敵に付与できる状態異常：\n` +
+      all.map((a) => `・${a.k}（被ダメージ×${a.v}）… ${a.card}`).join("\n") +
+      `\n\n※複数の状態異常が重なった場合、倍率の高いものだけが適用されます（掛け算されません）。この行には最大の×${best.v}が入っています。`,
+  };
+  row.cells = state.cards.map(() => ({ m: String(best.v), s: String(best.v) }));
 }
 
 // ---------- カードギャラリー ----------
@@ -772,7 +802,7 @@ function renderMultTable() {
     applyBtn.addEventListener("click", () => {
       const v = allInput.value;
       row.cells.forEach((cell) => { cell.m = v; cell.s = v; });
-      delete row.sk; delete row.ls; // 手で入れた値を自動更新で上書きしない
+      delete row.sk; delete row.ls; delete row.st; // 手で入れた値を自動更新で上書きしない
       renderMultTable();
       renderResults();
       saveState();
@@ -793,7 +823,7 @@ function renderMultTable() {
         if (key === "s" && !hasSub) input.disabled = true;
         input.addEventListener("input", () => {
           row.cells[ci][key] = input.value;
-          delete row.sk; delete row.ls; // 手で入れた値を自動更新で上書きしない
+          delete row.sk; delete row.ls; delete row.st; // 手で入れた値を自動更新で上書きしない
           renderResults();
           saveState();
         });

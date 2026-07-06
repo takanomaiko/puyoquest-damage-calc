@@ -27,6 +27,18 @@ def norm(name):
     return unicodedata.normalize("NFKC", name).replace(" ", "").replace("　", "")
 
 
+# 敵に付与するとダメージが増える状態異常とその倍率（game8調べ・高い方のみ適用）
+AILMENT_MAP = {"怒り": 2, "怯え": 2, "脱力": 2.5, "麻痺": 3}
+
+# フィールド効果の攻撃倍率（game8調べ）: (倍率, 対象範囲)
+FIELD_MAP = {
+    "晴れ": (1.5, "同色"), "雨": (1.5, "同色"), "風": (1.5, "同色"),
+    "雷": (1.5, "同色"), "雪": (1.5, "同色"),
+    "ミラクルスペース": (2.4, "味方全体"),   # 4属性以上での攻撃時
+    "テンペスト": (1.15, "味方全体"),        # 敵の状態異常1つにつき+15%（最大+90%）
+}
+
+
 def download_csv(gid):
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
     print(f"ダウンロード中... gid={gid}")
@@ -81,6 +93,20 @@ def main():
             name_map = syo
         elif dai == "その他" and syo in ("プリズム効果アップ", "クリティカル倍率up"):
             name_map = syo
+        # 状態異常（怒り/怯え/脱力/麻痺）: 敵に付与するとダメージ増
+        if dai == "状態異常" and syo in AILMENT_MAP:
+            ail = e.setdefault("ail", [])
+            if not any(a["k"] == syo for a in ail):
+                ail.append({"k": syo, "v": AILMENT_MAP[syo]})
+
+        # フィールド効果: 倍率がわかっているものだけ倍率行として追加
+        if dai == "フィールド効果" and syo in FIELD_MAP:
+            fv, fr = FIELD_MAP[syo]
+            sk = e.setdefault("sk", [])
+            fk = f"フィールド:{syo}"
+            if not any(s["k"] == fk for s in sk):
+                sk.append({"v": fv, "r": fr, "k": fk, "t": text})
+
         if name_map:
             try:
                 v = round(float(r[20]), 3)
