@@ -145,6 +145,7 @@
     .gcombo { top: 2px; right: 2px; font-size: 18px; padding: 3px; }
     .dstar { top: -7px; right: -4px; font-size: 16px; }
     p.hint { display: none; }  /* 長い説明文は隠す（検索結果内の情報は残す） */
+    #resultSection { display: none; }  /* 計算結果の表はスマホでは非表示（カードの数字タップで詳細） */
     .row-name { width: 8em; font-size: 12px; }
     .rowicon { width: 21px; height: 21px; }
   }
@@ -224,12 +225,12 @@
     </p>
   </section>
 
-  <section>
+  <section id="resultSection">
     <h2>計算結果</h2>
     <div class="scroll">
       <table id="resultTable">
         <thead>
-          <tr><th>カード</th><th>相性(主/副)</th><th>主属性ダメージ</th><th>副属性ダメージ</th><th>合計</th></tr>
+          <tr><th>カード</th><th>主属性ダメージ</th><th>副属性ダメージ</th><th>合計</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -380,6 +381,19 @@ const $ = (sel) => document.querySelector(sel);
 function fmt(n) { return Math.round(n).toLocaleString("ja-JP"); }
 function oku(n) { return (n / 1e8).toFixed(2) + "億"; }
 
+// 覚えやすい単位（万/億/兆）で四捨五入して表示する
+function fmtUnit(n) {
+  const units = [[1e12, "兆"], [1e8, "億"], [1e4, "万"]];
+  for (const [u, label] of units) {
+    if (n >= u) {
+      const v = n / u;
+      const s = v >= 100 ? Math.round(v).toLocaleString("ja-JP") : v >= 10 ? v.toFixed(1) : v.toFixed(2);
+      return s + label;
+    }
+  }
+  return Math.round(n).toLocaleString("ja-JP");
+}
+
 function colorBadge(c) { return `<span class="badge c${c}">${c}</span>`; }
 
 function makeSelect(options, value) {
@@ -518,9 +532,44 @@ function openSkillModal(title, text) {
   $("#skillModal").classList.add("open");
 }
 
+// 保存されたカード情報が古い場合に備えて、カードDBから最新の情報を引き直す
+function dbLookup(card) {
+  if (!hasDB || !card.name) return null;
+  const m = card.name.match(/^\[★(\d)\]\s*(.+)$/);
+  const rarity = m ? m[1] : null;
+  const n = m ? m[2] : card.name;
+  return CARD_DB.find((c) => c.n === n && (!rarity || c.r === rarity)) || null;
+}
+
+// ダメージ詳細ウィンドウ（ギャラリーの数字タップで開く）
+function openDmgModal(i) {
+  const card = state.cards[i];
+  const { results } = calc();
+  const r = results[i];
+  $("#skillModalTitle").textContent = `${card.name || "（無名）"} のダメージ`;
+  $("#skillModalBody").innerHTML =
+    `<table style="width:100%; margin-top:4px">` +
+    `<tr><td style="text-align:left">主属性 ${colorBadge(card.main)}</td><td class="num">${fmt(r.m)}</td><td class="num">${fmtUnit(r.m)}</td></tr>` +
+    (r.hasSub ? `<tr><td style="text-align:left">副属性 ${colorBadge(card.sub)}</td><td class="num">${fmt(r.s)}</td><td class="num">${fmtUnit(r.s)}</td></tr>` : "") +
+    `<tr><td style="text-align:left"><strong>合計</strong></td><td class="num"><strong>${fmt(r.m + r.s)}</strong></td><td class="num"><strong>${fmtUnit(r.m + r.s)}</strong></td></tr>` +
+    `</table>` +
+    `<p style="margin:10px 0 0; font-size:12px; color:var(--sub)">属性相性: 主×${r.affM}${r.hasSub ? ` ／ 副×${r.affS}` : ""}（敵は${state.enemyColor}属性）</p>`;
+  $("#skillModal").classList.add("open");
+}
+
 // カード詳細ウィンドウ（リーダー/サポートはリーダースキルも表示）
 function openCardModal(i) {
-  const card = state.cards[i];
+  const saved = state.cards[i];
+  const db = dbLookup(saved) || {};
+  const card = {
+    ...saved,
+    ns: saved.ns || db.ns || "",
+    ls: saved.ls || db.ls || "",
+    fp: saved.fp || db.fp || "",
+    ts: saved.ts || db.ts || "",
+    ab: saved.ab || db.ab || "",
+    ga: saved.ga || db.ga || "",
+  };
   const hasSub = card.sub && card.sub !== "なし";
   const role = i === 0 ? "リーダー" : i === 5 ? "サポート" : "";
   const head = $("#cardModalHead");
@@ -754,6 +803,9 @@ function renderGallery() {
     const dmg = document.createElement("div");
     dmg.className = "gdmg";
     dmg.textContent = "-";
+    dmg.style.cursor = "pointer";
+    dmg.title = "タップでダメージの詳細を見る";
+    dmg.addEventListener("click", () => openDmgModal(i));
 
     div.append(name, dmg);
     box.appendChild(div);
@@ -988,19 +1040,18 @@ function renderResults() {
     const tr = document.createElement("tr");
     tr.innerHTML =
       `<td style="text-align:left">${colorBadge(card.main)}${r.hasSub ? colorBadge(card.sub) : ""} ${card.name || "（無名）"}</td>` +
-      `<td>×${r.affM}${r.hasSub ? ` / ×${r.affS}` : ""}</td>` +
       `<td class="num">${fmt(r.m)}</td>` +
       `<td class="num">${r.hasSub ? fmt(r.s) : "-"}</td>` +
       `<td class="num"><strong>${fmt(r.m + r.s)}</strong></td>`;
     tbody.appendChild(tr);
   });
   $("#resultTotals").innerHTML =
-    `主属性のみ合計：${fmt(totalMain)}（${oku(totalMain)}）<br>` +
-    `総合計：<span class="big">${oku(total)}</span>（${fmt(total)}）`;
-  $("#totalBig").textContent = oku(total);
+    `主属性のみ合計：${fmtUnit(totalMain)}（${fmt(totalMain)}）<br>` +
+    `総合計：<span class="big">${fmtUnit(total)}</span>（${fmt(total)}）`;
+  $("#totalBig").textContent = fmtUnit(total);
   // ギャラリーのダメージ表示も更新
   document.querySelectorAll("#gallery .gdmg").forEach((el, i) => {
-    if (results[i]) el.textContent = oku(results[i].m + results[i].s);
+    if (results[i]) el.textContent = fmtUnit(results[i].m + results[i].s);
   });
 }
 
