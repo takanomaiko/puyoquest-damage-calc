@@ -66,9 +66,24 @@
   .gname { font-size: 13px; font-weight: 600; padding: 6px 6px 0; }
   .gdmg { font-size: 16px; color: var(--accent); font-weight: 700; padding: 2px 0 8px; }
   .gclear { position: absolute; top: 6px; right: 6px; }
+  /* コンビネーションの✨マーク */
+  .gcombo {
+    position: absolute; top: 3px; left: 3px; z-index: 1;
+    border: none; font-size: 18px; line-height: 1; padding: 4px; cursor: pointer;
+    background: rgba(255, 255, 255, .85); border-radius: 50%;
+    filter: grayscale(1); opacity: .55;
+  }
+  .gcombo.on {
+    filter: none; opacity: 1;
+    background: #fff8dc; box-shadow: 0 0 6px 2px rgba(255, 200, 40, .8);
+  }
+  .dstar {
+    position: absolute; top: -7px; right: -5px; font-size: 14px; pointer-events: none;
+    filter: drop-shadow(0 0 2px #fff);
+  }
   /* デッキ全体を横一列で見る帯（ゲームのデッキ画面イメージ） */
   #deckStrip { display: flex; align-items: flex-end; justify-content: center; gap: 5px; margin-bottom: 16px; }
-  .dcard { flex: 1 1 0; min-width: 0; text-align: center; cursor: pointer; }
+  .dcard { position: relative; flex: 1 1 0; min-width: 0; text-align: center; cursor: pointer; }
   .dcard.lead { flex: 1.15 1 0; }
   .dimg { width: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #eef1f8; display: flex; align-items: center; justify-content: center; }
   .dcard.lead .dimg { border: 2px solid var(--accent); box-shadow: 0 0 0 2px rgba(91, 110, 225, .15); }
@@ -147,7 +162,7 @@
     <div class="scroll">
       <table id="deckTable">
         <thead>
-          <tr><th>カード名</th><th>攻撃力</th><th>主属性</th><th>副属性</th></tr>
+          <tr><th>カード名</th><th>攻撃力</th><th>主属性</th><th>副属性</th><th>コンビ✨</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -264,7 +279,7 @@ function sampleState() {
   const emptyCells = () => Array.from({ length: 6 }, () => ({ m: "", s: "" }));
   return {
     deckName: "",
-    cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, main: "赤", sub: "なし", img: "" })),
+    cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, main: "赤", sub: "なし", img: "", combo: false })),
     enemyColor: "緑",
     enemyShield: "盾なし",
     supportAtk: 500,
@@ -486,6 +501,39 @@ function refreshAutoRows() {
     });
   }
   refreshAilmentRow();
+  refreshComboRow();
+}
+
+// コンビネーションの行（✨を付けたカードだけ×1.2）
+function refreshComboRow() {
+  let row = state.rows.find((r) => r.combo);
+  const targets = state.cards.filter((c) => c.combo);
+  if (targets.length === 0) {
+    if (row) state.rows = state.rows.filter((r) => !r.combo);
+    return;
+  }
+  if (!row) {
+    row = { name: "コンビネーション", on: true, combo: true, cells: [] };
+    state.rows.push(row);
+  }
+  row.info = {
+    card: "✨マークのカード",
+    img: "",
+    txt: `コンビネーションボーナス：✨を付けたカードの攻撃力を1.2倍にします。\n\n対象カード：\n` +
+      targets.map((c) => `・${c.name || "（無名）"}`).join("\n"),
+  };
+  row.cells = state.cards.map((c) => (c.combo ? { m: "1.2", s: "1.2" } : { m: "", s: "" }));
+}
+
+// ✨のON/OFF切り替え（ギャラリー・デッキ表の両方から使う）
+function toggleCombo(i) {
+  state.cards[i].combo = !state.cards[i].combo;
+  refreshAutoRows();
+  renderMultTable();
+  renderGallery();
+  renderDeck();
+  renderResults();
+  saveState();
 }
 
 // 状態異常の行（デッキ全体で1行）
@@ -579,6 +627,14 @@ function renderDeckStrip() {
     label.textContent = labels[i] || "";
     div.appendChild(label);
 
+    // コンビネーション対象なら✨マーク（ゲーム画面と同じ雰囲気）
+    if (card.combo) {
+      const star = document.createElement("span");
+      star.className = "dstar";
+      star.textContent = "✨";
+      div.appendChild(star);
+    }
+
     div.addEventListener("click", () => { pickerTarget = i; filePicker.click(); });
     box.appendChild(div);
   });
@@ -608,6 +664,14 @@ function renderGallery() {
       filePicker.click();
     });
     div.appendChild(imgBox);
+
+    // コンビネーションの✨ボタン
+    const comboBtn = document.createElement("button");
+    comboBtn.textContent = "✨";
+    comboBtn.className = "gcombo" + (card.combo ? " on" : "");
+    comboBtn.title = card.combo ? "コンビネーション対象（タップで解除）" : "タップでコンビネーション対象にする";
+    comboBtn.addEventListener("click", () => toggleCombo(i));
+    div.appendChild(comboBtn);
 
     if (card.img) {
       const clearBtn = document.createElement("button");
@@ -703,7 +767,15 @@ function renderDeck() {
     });
     tdSub.appendChild(subSel);
 
-    tr.append(tdName, tdAtk, tdMain, tdSub);
+    const tdCombo = document.createElement("td");
+    const comboChk = document.createElement("input");
+    comboChk.type = "checkbox";
+    comboChk.checked = !!card.combo;
+    comboChk.title = "コンビネーション対象(×1.2)";
+    comboChk.addEventListener("change", () => toggleCombo(i));
+    tdCombo.appendChild(comboChk);
+
+    tr.append(tdName, tdAtk, tdMain, tdSub, tdCombo);
     tbody.appendChild(tr);
   });
 }
