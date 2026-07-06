@@ -117,7 +117,11 @@ def parse_skills(jpase, jplse):
         return "味方全体"
 
     if jpase:
-        vals = [float(v) for v in re.findall(r"(?:攻撃力|攻撃値)を([\d.]+)倍", jpase)]
+        # 「n倍」と「n％アップ」(=1+n/100倍)の両方の表記に対応
+        vals = []
+        for num, unit in re.findall(r"(?:攻撃力|攻撃値)を([\d.]+)(倍|％アップ|%アップ)", jpase):
+            v = float(num)
+            vals.append(v if unit == "倍" else round(1 + v / 100, 3))
         if vals and min(vals) > 1:
             sk.append({"v": min(vals), "r": color_range(jpase), "k": "攻撃エンハ", "t": jpase})
         m = re.search(r"受けるダメージを([\d.]+)倍", jpase)
@@ -166,7 +170,18 @@ def parse_tokumori(f):
         if "与えるダメージ" in txt:
             sk.append({"v": v, "r": "自身のみ", "k": "与ダメアップ(特盛)", "t": txt})
         elif "攻撃力" in txt or "攻撃値" in txt:
-            k = "攻撃エンハ(特盛体力MAX)" if "体力MAX" in txt else "攻撃エンハ(特盛)"
+            # 「％アップ」表記は倍率に換算（150%アップ → 2.5倍）
+            pct = "％アップ" in txt or "%アップ" in txt
+            if pct and "Lv" in txt:
+                v = round(1 + v * 10 / 100, 3)   # 「Lv.×n%」はLv.10換算
+            elif pct:
+                v = round(1 + v / 100, 3)
+            if "ブーストエリア" in txt:
+                k = "ブーストエリア強化(特盛)"
+            elif "体力MAX" in txt:
+                k = "攻撃エンハ(特盛体力MAX)"
+            else:
+                k = "攻撃エンハ(特盛)"
             sk.append({"v": v, "r": color_range(txt), "k": k, "t": txt})
         elif "プリズム" in txt and "効果" in txt:
             sk.append({"v": v, "r": "味方全体", "k": "プリズム効果アップ(特盛)", "t": txt})
