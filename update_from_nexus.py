@@ -73,13 +73,14 @@ def parse_template(text):
     fields = {}
     # 「|hpmax=6227|atkmax=5338|...」のように1行に複数書かれる単純な項目はピンポイントで拾う
     for key in ("code", "rarity", "jpname", "color", "color2", "type1",
-                "maxlv", "cost", "hpmax", "atkmax", "rcvmax"):
+                "maxlv", "cost", "hpmax", "atkmax", "rcvmax",
+                "tse10", "ts2e10", "ts3e10", "kse10"):
         m = re.search(r"\|\s*" + key + r"\s*=\s*([^|\n{}]*)", text)
         if m:
             fields[key] = m.group(1).strip()
     # 効果文（{{○|○}}などの記法を含むので行ごと拾う）
     for line in text.splitlines():
-        m = re.match(r"\|\s*(jpase|jpasfe|jplse)\s*=\s*(.*)", line.strip())
+        m = re.match(r"\|\s*(jpase|jpasfe|jplse|jptse|jpts2e|jpts3e|jpkse|jpgae)\s*=\s*(.*)", line.strip())
         if m:
             fields[m.group(1)] = m.group(2).strip()
     return fields
@@ -130,6 +131,53 @@ def parse_skills(jpase, jplse):
     return sk, ail, lm, lr
 
 
+def parse_tokumori(f):
+    """とくもりスキル(ESS)ときらめきオーラ(GA)を倍率行に変換する"""
+    sk = []
+
+    def color_range(text):
+        cols = [c for c in "赤青緑黄紫" if f"{c}属性カード" in text]
+        return "".join(cols) if cols else "味方全体"
+
+    # とくもりスキル（第1〜第3、キラー）: Lv10の値を採用
+    for txt_key, val_key in (("jptse", "tse10"), ("jpts2e", "ts2e10"),
+                             ("jpts3e", "ts3e10"), ("jpkse", "kse10")):
+        raw = f.get(txt_key, "")
+        val = f.get(val_key, "")
+        if not raw or not val:
+            continue
+        try:
+            v = float(val)
+        except ValueError:
+            continue
+        txt = strip_wiki(raw.replace("{{tsparam}}", val))
+        if v <= 1:
+            continue
+        if "与えるダメージ" in txt:
+            sk.append({"v": v, "r": "自身のみ", "k": "与ダメアップ(特盛)", "t": txt})
+        elif "攻撃力" in txt or "攻撃値" in txt:
+            k = "攻撃エンハ(特盛体力MAX)" if "体力MAX" in txt else "攻撃エンハ(特盛)"
+            sk.append({"v": v, "r": color_range(txt), "k": k, "t": txt})
+        elif "プリズム" in txt and "効果" in txt:
+            sk.append({"v": v, "r": "味方全体", "k": "プリズム効果アップ(特盛)", "t": txt})
+        elif "クリティカル" in txt and "倍率" in txt:
+            cv = round(1 + v / 100, 3) if v >= 5 else v
+            sk.append({"v": cv, "r": "味方全体", "k": "クリティカル倍率up(特盛)", "t": txt})
+        # 回復・体力系のとくもりはダメージに関係ないので入れない
+
+    # きらめきオーラ: デッキ構成で値が変わるものが多いので、
+    # 倍率が読み取れなければ空欄の行を作る（?ボタンで効果文を確認して手入力）
+    raw = f.get("jpgae", "")
+    if raw:
+        txt = strip_wiki(raw)
+        if "攻撃" in txt and ("倍" in txt or "アップ" in txt):
+            m = re.search(r"攻撃(?:力|値)を([\d.]+)倍", txt)
+            v = float(m.group(1)) if m else ""
+            sk.append({"v": v, "r": color_range(txt), "k": "きらめきオーラ", "t": txt})
+
+    return sk
+
+
 def main():
     cache = []
     if os.path.exists(CACHE):
@@ -178,6 +226,7 @@ def main():
             jpase = strip_wiki(f.get("jpase", ""))
             jplse = strip_wiki(f.get("jplse", ""))
             sk, ail, lm, lr = parse_skills(jpase, jplse)
+            sk.extend(parse_tokumori(f))  # とくもりスキル・きらめきオーラ
             card = {
                 "code": code,
                 "n": f["jpname"],
