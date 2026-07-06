@@ -59,6 +59,26 @@ def main():
         if kind == "LS" and "ls" not in e and text:
             e["ls"] = text
 
+        # リーダースキル倍率 [体力, 攻撃, 回復] とその範囲（列11-14）
+        if "lm" not in e:
+            try:
+                lm = [round(float(r[11]), 3), round(float(r[12]), 3), round(float(r[13]), 3)]
+                if any(lm):
+                    e["lm"] = lm
+                    e["lr"] = r[14].strip()
+            except ValueError:
+                pass
+
+        # エンハンス系スキル(NS)の倍率・範囲・名前（列17-21）
+        # フルパワー版など複数候補がある場合は小さい方＝通常版を採用
+        if kind == "NS" and ("エンハ" in r[17] or "攻撃値up" in r[17]):
+            try:
+                v = round(float(r[20]), 3)
+                if v > 1 and ("e" not in e or v < e["e"]["v"]):
+                    e["e"] = {"v": v, "r": r[19].strip(), "k": r[18].strip() or r[17].strip()}
+            except ValueError:
+                pass
+
     # --- ステDB: 「最大ステータス(とっくん込み)」ブロックから攻撃力などを拾う ---
     # 列32=名称, 列34=★n, 列35=体力極, 列36=攻撃極, 列37=回復極
     stats = {}

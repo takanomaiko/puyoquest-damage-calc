@@ -410,9 +410,53 @@ function pickCard(c) {
   if (c.a) card.atk = c.a;   // ステDBの攻撃力（とっくん最大値）
   card.ns = c.ns || "";
   card.ls = c.ls || "";
+  applySkillRows(searchTarget, c);
   closeSearch();
   renderAll();
   saveState();
+}
+
+// スキルの範囲（味方全体/同色/色指定）が対象カードに当てはまるか
+function skillRangeMatches(range, srcColor, target) {
+  if (!range || range.includes("全体")) return true;
+  if (range.includes("同色")) return target.main === srcColor;
+  const colors = COLORS.filter((col) => range.includes(col));
+  if (colors.length) return colors.includes(target.main);
+  return true;
+}
+
+// 選んだカードのスキル倍率を倍率表に自動入力する
+function applySkillRows(slot, c) {
+  const srcColor = COLOR_NUM[c.m] || "赤";
+
+  // 1枚目→リーダースキル行、6枚目→サポートリーダー行（攻撃倍率）
+  if ((slot === 0 || slot === 5) && c.lm && c.lm[1]) {
+    const rowName = slot === 0 ? "リーダースキル" : "サポートリーダー";
+    let row = state.rows.find((r) => r.name === rowName);
+    if (!row) {
+      row = { name: rowName, on: true, cells: Array.from({ length: 6 }, () => ({ m: "", s: "" })) };
+      state.rows.unshift(row);
+    }
+    state.cards.forEach((cd, j) => {
+      const v = skillRangeMatches(c.lr, srcColor, cd) ? String(c.lm[1]) : "";
+      row.cells[j].m = v;
+      row.cells[j].s = v;
+    });
+  }
+
+  // エンハンス系スキル: スロットごとに自動行を1つ作る（選び直したら置き換え）
+  state.rows = state.rows.filter((r) => r.auto !== slot);
+  if (c.e && c.e.v) {
+    state.rows.push({
+      name: `${c.e.k || "エンハンス"}（${c.n}）`,
+      on: true,
+      auto: slot,
+      cells: state.cards.map((cd) => {
+        const v = skillRangeMatches(c.e.r, srcColor, cd) ? String(c.e.v) : "";
+        return { m: v, s: v };
+      }),
+    });
+  }
 }
 
 // ---------- カードギャラリー ----------
