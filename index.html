@@ -67,7 +67,7 @@
   /* デッキ全体を横一列で見る帯（ゲームのデッキ画面イメージ） */
   #deckStrip { display: flex; align-items: flex-end; justify-content: center; gap: 5px; margin-bottom: 16px; }
   .dcard { flex: 1 1 0; min-width: 0; text-align: center; cursor: pointer; }
-  .dcard.lead { flex: 1.35 1 0; }
+  .dcard.lead { flex: 1.15 1 0; }
   .dimg { width: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #eef1f8; display: flex; align-items: center; justify-content: center; }
   .dcard.lead .dimg { border: 2px solid var(--accent); box-shadow: 0 0 0 2px rgba(91, 110, 225, .15); }
   .dimg:hover { background: #e2e8f5; }
@@ -448,7 +448,7 @@ function renderDeckStrip() {
   const box = $("#deckStrip");
   if (!box) return;
   box.innerHTML = "";
-  const labels = { 0: "LEADER", 5: "サポ" };
+  const labels = { 0: "リーダー", 5: "サポート" };
   state.cards.forEach((card, i) => {
     const isLead = i === 0 || i === 5;
     const div = document.createElement("div");
