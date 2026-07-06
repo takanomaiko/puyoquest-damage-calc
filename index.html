@@ -64,6 +64,16 @@
   .gname { font-size: 13px; font-weight: 600; padding: 6px 6px 0; }
   .gdmg { font-size: 16px; color: var(--accent); font-weight: 700; padding: 2px 0 8px; }
   .gclear { position: absolute; top: 6px; right: 6px; }
+  /* デッキ全体を横一列で見る帯（ゲームのデッキ画面イメージ） */
+  #deckStrip { display: flex; align-items: flex-end; justify-content: center; gap: 5px; margin-bottom: 16px; }
+  .dcard { flex: 1 1 0; min-width: 0; text-align: center; cursor: pointer; }
+  .dcard.lead { flex: 1.35 1 0; }
+  .dimg { width: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #eef1f8; display: flex; align-items: center; justify-content: center; }
+  .dcard.lead .dimg { border: 2px solid var(--accent); box-shadow: 0 0 0 2px rgba(91, 110, 225, .15); }
+  .dimg:hover { background: #e2e8f5; }
+  .dimg img { width: 100%; height: 100%; object-fit: contain; }
+  .dimg .dph { color: var(--sub); font-size: 12px; font-weight: 700; }
+  .dlabel { font-size: 9px; font-weight: 700; margin-top: 3px; color: var(--accent); height: 12px; }
   .deck-name {
     width: 100%; font-size: 22px; font-weight: 700; color: var(--text);
     border: none; border-bottom: 2px dashed var(--border); border-radius: 0;
@@ -109,6 +119,7 @@
 
   <section>
     <input type="text" id="deckName" class="deck-name" placeholder="デッキ名を入力">
+    <div id="deckStrip"></div>
     <div id="gallery"></div>
     <p class="hint" style="margin-top:10px">
       枠をクリックすると、お手持ちの画像（スクリーンショットなど）をカードのイラストとして設定できます。<br>
@@ -432,7 +443,42 @@ function shrinkImage(file, cb) {
   img.src = URL.createObjectURL(file);
 }
 
+// デッキ全体を横一列に並べた帯を描く（1枚目=リーダー, 6枚目=サブリーダーを強調）
+function renderDeckStrip() {
+  const box = $("#deckStrip");
+  if (!box) return;
+  box.innerHTML = "";
+  const labels = { 0: "LEADER", 5: "サポ" };
+  state.cards.forEach((card, i) => {
+    const isLead = i === 0 || i === 5;
+    const div = document.createElement("div");
+    div.className = "dcard" + (isLead ? " lead" : "");
+    div.title = (card.name || `${i + 1}枚目`) + "（クリックで画像を設定）";
+
+    const imgBox = document.createElement("div");
+    imgBox.className = "dimg";
+    if (card.img) {
+      const img = document.createElement("img");
+      img.src = card.img;
+      img.alt = card.name;
+      imgBox.appendChild(img);
+    } else {
+      imgBox.innerHTML = `<span class="dph">${i + 1}</span>`;
+    }
+    div.appendChild(imgBox);
+
+    const label = document.createElement("div");
+    label.className = "dlabel";
+    label.textContent = labels[i] || "";
+    div.appendChild(label);
+
+    div.addEventListener("click", () => { pickerTarget = i; filePicker.click(); });
+    box.appendChild(div);
+  });
+}
+
 function renderGallery() {
+  renderDeckStrip();
   const box = $("#gallery");
   box.innerHTML = "";
   state.cards.forEach((card, i) => {
