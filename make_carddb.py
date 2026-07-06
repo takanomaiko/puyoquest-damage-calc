@@ -91,9 +91,11 @@ def main():
                     # 同名スキルはフルパワー版などの重複 → 小さい方＝通常版を残す
                     dup = next((s for s in sk if s["k"] == name_map), None)
                     if dup:
-                        dup["v"] = min(dup["v"], v)
+                        if v < dup["v"]:
+                            dup["v"] = v
+                            dup["t"] = text
                     else:
-                        sk.append({"v": v, "r": r[19].strip(), "k": name_map})
+                        sk.append({"v": v, "r": r[19].strip(), "k": name_map, "t": text})
             except ValueError:
                 pass
 

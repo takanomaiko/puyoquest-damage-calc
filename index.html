@@ -82,8 +82,14 @@
     background: transparent; padding: 2px 4px 6px; margin-bottom: 12px;
   }
   .deck-name:focus { outline: none; border-bottom: 2px solid var(--accent); }
-  #searchModal { position: fixed; inset: 0; background: rgba(20, 25, 40, .5); display: none; align-items: flex-start; justify-content: center; padding-top: 8vh; z-index: 100; }
-  #searchModal.open { display: flex; }
+  #searchModal, #skillModal { position: fixed; inset: 0; background: rgba(20, 25, 40, .5); display: none; align-items: flex-start; justify-content: center; padding-top: 8vh; z-index: 100; }
+  #searchModal.open, #skillModal.open { display: flex; }
+  /* 倍率表: 名前の列は横スクロールしても固定、カードはアイコンで見分ける */
+  #multTable .namecell { white-space: nowrap; text-align: left; }
+  .rowicon { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; margin-right: 3px; border-radius: 4px; }
+  #multTable thead tr:first-child th:first-child,
+  #multTable tbody td:first-child { position: sticky; left: 0; z-index: 2; background: #fff; }
+  #multTable thead tr:first-child th:first-child { background: #eef1f8; }
   .sbox { background: #fff; border-radius: 12px; width: min(560px, 92vw); max-height: 74vh; display: flex; flex-direction: column; padding: 14px; }
   .sbox > input { width: 100%; font-size: 15px; padding: 8px; }
   #searchResults { overflow-y: auto; margin-top: 10px; }
@@ -108,6 +114,8 @@
     .gdmg { font-size: 14px; padding: 2px 0 6px; }
     .gclear { top: 2px; right: 2px; padding: 0 5px; font-size: 10px; line-height: 1.6; opacity: .7; }
     .hint { display: none; }  /* 説明文は隠してスッキリさせる */
+    .row-name { width: 8em; font-size: 12px; }
+    .rowicon { width: 21px; height: 21px; }
   }
 </style>
 </head>
@@ -210,6 +218,14 @@
     <input type="text" id="searchInput" placeholder="カード名の一部を入力（例：アミティ）">
     <div id="searchResults"></div>
     <p style="text-align:right; margin:8px 0 0"><button id="searchClose" class="small danger">閉じる</button></p>
+  </div>
+</div>
+
+<div id="skillModal">
+  <div class="sbox">
+    <div id="skillModalTitle" style="font-weight:700; font-size:15px"></div>
+    <div id="skillModalBody" style="margin-top:10px; font-size:13px; line-height:1.8"></div>
+    <p style="text-align:right; margin:12px 0 0"><button id="skillClose" class="small danger">閉じる</button></p>
   </div>
 </div>
 
@@ -361,6 +377,10 @@ $("#searchClose").addEventListener("click", closeSearch);
 $("#searchModal").addEventListener("click", (e) => {
   if (e.target.id === "searchModal") closeSearch();
 });
+$("#skillClose").addEventListener("click", () => $("#skillModal").classList.remove("open"));
+$("#skillModal").addEventListener("click", (e) => {
+  if (e.target.id === "skillModal") $("#skillModal").classList.remove("open");
+});
 
 $("#searchInput").addEventListener("input", () => {
   if (!hasDB) return;
@@ -423,20 +443,31 @@ function applySkillRows(slot, c) {
     }
     // 再計算用の情報を行に持たせる（リダ倍率がないカードなら解除）
     row.ls = (c.lm && c.lm[1]) ? { v: c.lm[1], r: c.lr || "", slot } : undefined;
+    // スキル確認ボタン用に、元カードの名前・アイコン・リーダースキル文も持たせる
+    row.info = { card: c.n, img: c.u || "", txt: c.ls || "" };
   }
 
   // 倍率スキル: スロットごとに自動行を作る（選び直したら置き換え）
+  // 行の名前はスキル名だけにして、カードはアイコンで見分ける
   state.rows = state.rows.filter((r) => r.auto !== slot);
   for (const s of c.sk || []) {
     state.rows.push({
-      name: `${s.k}（${c.n}）`,
+      name: s.k,
       on: true,
       auto: slot,
       sk: { v: s.v, r: s.r || "" },
+      info: { card: c.n, img: c.u || "", txt: s.t || "" },
       cells: [],
     });
   }
   refreshAutoRows();
+}
+
+// スキル効果文のポップアップ
+function openSkillModal(title, text) {
+  $("#skillModalTitle").textContent = title;
+  $("#skillModalBody").textContent = text;
+  $("#skillModal").classList.add("open");
 }
 
 // 自動入力された行のセルを、今のデッキの属性に合わせて再計算する
@@ -681,7 +712,7 @@ function updateMultHeader() {
   thead.innerHTML = "";
   const tr1 = document.createElement("tr");
   tr1.innerHTML =
-    `<th rowspan="2">ON</th><th rowspan="2">倍率の名前</th><th rowspan="2">全体</th>` +
+    `<th rowspan="2">倍率の名前</th><th rowspan="2">ON</th><th rowspan="2">全体</th>` +
     state.cards.map((c) => `<th colspan="2">${c.name || "（無名）"}</th>`).join("") +
     `<th rowspan="2"></th>`;
   const tr2 = document.createElement("tr");
@@ -705,12 +736,30 @@ function renderMultTable() {
     tdOn.appendChild(chk);
 
     const tdName = document.createElement("td");
+    tdName.className = "namecell";
+    if (row.info && row.info.img) {
+      const icon = document.createElement("img");
+      icon.className = "rowicon";
+      icon.src = row.info.img;
+      icon.alt = icon.title = row.info.card;
+      tdName.appendChild(icon);
+    }
     const nameInput = document.createElement("input");
     nameInput.type = "text";
     nameInput.className = "row-name";
     nameInput.value = row.name;
     nameInput.addEventListener("input", () => { row.name = nameInput.value; saveState(); });
     tdName.appendChild(nameInput);
+    if (row.info && row.info.txt) {
+      const skillBtn = document.createElement("button");
+      skillBtn.textContent = "？";
+      skillBtn.className = "small";
+      skillBtn.title = "スキル効果を見る";
+      skillBtn.addEventListener("click", () => {
+        openSkillModal(`${row.name}（${row.info.card}）`, row.info.txt);
+      });
+      tdName.appendChild(skillBtn);
+    }
 
     const tdAll = document.createElement("td");
     const allInput = document.createElement("input");
@@ -730,7 +779,7 @@ function renderMultTable() {
     });
     tdAll.append(allInput, document.createTextNode(" "), applyBtn);
 
-    tr.append(tdOn, tdName, tdAll);
+    tr.append(tdName, tdOn, tdAll);
 
     state.cards.forEach((card, ci) => {
       const hasSub = card.sub && card.sub !== "なし";
