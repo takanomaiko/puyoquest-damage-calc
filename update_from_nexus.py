@@ -28,6 +28,16 @@ TYPE_EN = {"Attack": "こうげき", "Balance": "バランス", "Balanced": "バ
            "HP": "たいりょく", "Recover": "かいふく", "Recovery": "かいふく"}
 AILMENTS = {"怒り": 2, "怯え": 2, "脱力": 2.5, "麻痺": 3}
 
+# 特訓パターンごとのステータス加算 (体力+, 攻撃+, 回復+)
+# ユーザーの検索シート「特訓パターン一覧」より。
+# Wikiのカテゴリから確実に判別できるフルパワー(F)とフェス(E)のみ使用
+TRAIN_BONUS = {
+    ("7", "F"): (3500, 1750, 700),
+    ("7", "E"): (3400, 1700, 680),
+    ("6", "F"): (2600, 1300, 520),
+    ("6", "E"): (2600, 1300, 520),
+}
+
 
 def api_get(params):
     params = dict(params, format="json")
@@ -72,7 +82,7 @@ def parse_template(text):
     """カードテンプレートの中身を{項目名: 値}に分解する"""
     fields = {}
     # 「|hpmax=6227|atkmax=5338|...」のように1行に複数書かれる単純な項目はピンポイントで拾う
-    for key in ("code", "rarity", "jpname", "color", "color2", "type1",
+    for key in ("code", "rarity", "name", "jpname", "color", "color2", "type1",
                 "maxlv", "cost", "hpmax", "atkmax", "rcvmax",
                 "tse10", "ts2e10", "ts3e10", "kse10"):
         m = re.search(r"\|\s*" + key + r"\s*=\s*([^|\n{}]*)", text)
@@ -249,6 +259,8 @@ def main():
                     pass
             if "a" in card:
                 card["x"] = 1  # とっくんなしのLv.MAX値
+            if f.get("name"):
+                card["_page"] = f"PPQ:{f['name']}/★{card['r']}"  # カテゴリ確認用（後で消す）
             if jpase:
                 card["ns"] = jpase
             if jplse:
@@ -265,6 +277,36 @@ def main():
         done = min(i + 50, len(missing))
         print(f"  取得中... {done}/{len(missing)}")
         time.sleep(0.5)
+
+    # フルパワー/フェスをWikiのカテゴリから判別して、とっくん込みステータスに変換
+    print("特訓パターンを判別中...")
+    pages = [c for c in new_cards if c.get("_page") and "a" in c]
+    trained = 0
+    for i in range(0, len(pages), 25):
+        batch = pages[i:i + 25]
+        d = api_get({"action": "query", "prop": "categories", "cllimit": "max",
+                     "titles": "|".join(c["_page"] for c in batch)})
+        cats_by_title = {}
+        for p in d["query"]["pages"].values():
+            cats_by_title[p["title"]] = {c["title"] for c in p.get("categories", [])}
+        for c in batch:
+            cats = cats_by_title.get(c["_page"], set())
+            pat = None
+            if "Category:PPQ:Cards with Full Power Skill" in cats:
+                pat = "F"
+            elif "Category:PPQ:Puyo Fest Keyword" in cats:
+                pat = "E"
+            bonus = TRAIN_BONUS.get((c["r"], pat))
+            if bonus:
+                c["h"] = c.get("h", 0) + bonus[0]
+                c["a"] = c.get("a", 0) + bonus[1]
+                c["c"] = c.get("c", 0) + bonus[2]
+                c.pop("x", None)  # とっくん込みになったので「とっくんなし」印を外す
+                trained += 1
+        time.sleep(0.4)
+    for c in new_cards:
+        c.pop("_page", None)
+    print(f"  とっくん込みに変換: {trained}枚（フルパワー/フェス）")
 
     cache.extend(new_cards)
     with open(CACHE, "w", encoding="utf-8") as fp:
