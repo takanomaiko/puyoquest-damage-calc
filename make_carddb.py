@@ -85,7 +85,8 @@ def main():
         # 「発動率50%」「攻撃ダウン80%」など倍率でないものは除外する
         dai, syo = r[17].strip(), r[18].strip()
         name_map = None
-        if "エンハ" in dai or "攻撃値up" in dai:          # エンハンス/条件付きエンハンス/攻撃値up
+        if ("エンハ" in dai or "攻撃値up" in dai) and "回復" not in syo and "体力エンハ" not in syo:
+            # エンハンス/条件付きエンハンス/攻撃値up（回復・体力エンハはダメージと無関係なので除外）
             name_map = syo or dai
         elif dai == "与ダメアップ":                        # キラースキル系
             name_map = "与ダメアップ" + ("(確率)" if "確率" in syo else "")
@@ -94,10 +95,12 @@ def main():
         elif dai == "その他" and syo in ("プリズム効果アップ", "クリティカル倍率up"):
             name_map = syo
         # 状態異常（怒り/怯え/脱力/麻痺）: 敵に付与するとダメージ増
-        if dai == "状態異常" and syo in AILMENT_MAP:
+        # リダスキの「開幕怯え」も怯えとして扱う
+        ail_key = syo if dai == "状態異常" else ("怯え" if syo == "開幕怯え" else None)
+        if ail_key in AILMENT_MAP:
             ail = e.setdefault("ail", [])
-            if not any(a["k"] == syo for a in ail):
-                ail.append({"k": syo, "v": AILMENT_MAP[syo]})
+            if not any(a["k"] == ail_key for a in ail):
+                ail.append({"k": ail_key, "v": AILMENT_MAP[ail_key]})
 
         # フィールド効果: 倍率がわかっているものだけ倍率行として追加
         if dai == "フィールド効果" and syo in FIELD_MAP:
