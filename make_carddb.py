@@ -69,13 +69,31 @@ def main():
             except ValueError:
                 pass
 
-        # エンハンス系スキル(NS)の倍率・範囲・名前（列17-21）
-        # フルパワー版など複数候補がある場合は小さい方＝通常版を採用
-        if kind == "NS" and ("エンハ" in r[17] or "攻撃値up" in r[17]):
+        # ダメージ計算に使える倍率スキルを抽出（列17-21: 大分類/小分類/範囲/倍率）
+        # 「発動率50%」「攻撃ダウン80%」など倍率でないものは除外する
+        dai, syo = r[17].strip(), r[18].strip()
+        name_map = None
+        if "エンハ" in dai or "攻撃値up" in dai:          # エンハンス/条件付きエンハンス/攻撃値up
+            name_map = syo or dai
+        elif dai == "与ダメアップ":                        # キラースキル系
+            name_map = "与ダメアップ" + ("(確率)" if "確率" in syo else "")
+        elif dai == "デバフ" and ("被ダメ" in syo or syo == "盾破壊"):
+            name_map = syo
+        elif dai == "その他" and syo in ("プリズム効果アップ", "クリティカル倍率up"):
+            name_map = syo
+        if name_map:
             try:
                 v = round(float(r[20]), 3)
-                if v > 1 and ("e" not in e or v < e["e"]["v"]):
-                    e["e"] = {"v": v, "r": r[19].strip(), "k": r[18].strip() or r[17].strip()}
+                if syo == "クリティカル倍率up" and v >= 5:
+                    v = round(1 + v / 100, 3)              # 「50」→「1.5倍」に換算
+                if v > 1:
+                    sk = e.setdefault("sk", [])
+                    # 同名スキルはフルパワー版などの重複 → 小さい方＝通常版を残す
+                    dup = next((s for s in sk if s["k"] == name_map), None)
+                    if dup:
+                        dup["v"] = min(dup["v"], v)
+                    else:
+                        sk.append({"v": v, "r": r[19].strip(), "k": name_map})
             except ValueError:
                 pass
 

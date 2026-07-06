@@ -199,7 +199,7 @@
   </section>
 
   <footer>
-    <button id="resetBtn" class="danger">サンプルデータに戻す</button>
+    <button id="resetBtn" class="danger">初期状態に戻す</button>
     <p class="hint">入力内容はこのブラウザに自動保存されます。</p>
   </footer>
 
@@ -242,35 +242,21 @@ const SHIELDS = {
 
 const STORAGE_KEY = "puyoquest-damage-calc-v1";
 
-// サンプル：セラムン蒸気魔導赤（合計18.24億になるはず）
+// 初期状態：空のデッキ＋リーダー/サポートの2行だけ
+// （その他の倍率行は、カードを検索で選んだときにスキルから自動で追加される）
 function sampleState() {
-  const all = (m, s) => Array.from({ length: 6 }, () => ({ m: String(m), s: String(s) }));
+  const emptyCells = () => Array.from({ length: 6 }, () => ({ m: "", s: "" }));
   return {
-    deckName: "セラムン蒸気魔導赤",
-    cards: [
-      { name: "エターナルセーラームーン", atk: 4963, main: "黄", sub: "青", img: "" },
-      { name: "蒸気都市のアミティ",       atk: 7088, main: "赤", sub: "なし", img: "" },
-      { name: "ボダマル",                 atk: 4518, main: "赤", sub: "なし", img: "" },
-      { name: "追憶の天騎士レガムント",   atk: 5990, main: "黄", sub: "青", img: "" },
-      { name: "ラフィソル",               atk: 5645, main: "紫", sub: "青", img: "" },
-      { name: "サタン＆エコロ",           atk: 4990, main: "緑", sub: "紫", img: "" },
-    ],
+    deckName: "",
+    cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, main: "赤", sub: "なし", img: "" })),
     enemyColor: "緑",
     enemyShield: "盾なし",
     supportAtk: 500,
     coefMain: 3,
     coefSub: 1,
     rows: [
-      { name: "リーダースキル",        on: true, cells: all(4.5, 4.5) },
-      { name: "サポートリーダー",      on: true, cells: all(5.5, 5.5) },
-      { name: "エンハンス",            on: true, cells: all("", "") },
-      { name: "とっくん攻撃UP",        on: true, cells: [ {m:"",s:""}, {m:"2.5",s:"2.5"}, {m:"2.5",s:"2.5"}, {m:"",s:""}, {m:"",s:""}, {m:"",s:""} ] },
-      { name: "とっくん条件UP(プリボ)", on: true, cells: all(3.6, 3.6) },
-      { name: "とっくん条件UP(体力)",   on: true, cells: all(1.4, 1.4) },
-      { name: "とっくんクリ倍率UP",    on: true, cells: all(1.5, 1.5) },
-      { name: "クリティカル",          on: true, cells: [ {m:"",s:""}, {m:"1.5",s:""}, {m:"1.5",s:""}, {m:"1.5",s:""}, {m:"1.5",s:"1.5"}, {m:"1.5",s:"1.5"} ] },
-      { name: "キラースキル",          on: true, cells: [ {m:"",s:""}, {m:"5",s:"5"}, {m:"",s:""}, {m:"",s:""}, {m:"",s:""}, {m:"",s:""} ] },
-      { name: "ぷよ消し倍率",          on: true, cells: all(9, 9) },
+      { name: "リーダースキル",   on: true, cells: emptyCells() },
+      { name: "サポートリーダー", on: true, cells: emptyCells() },
     ],
   };
 }
@@ -427,34 +413,44 @@ function skillRangeMatches(range, srcColor, target) {
 
 // 選んだカードのスキル倍率を倍率表に自動入力する
 function applySkillRows(slot, c) {
-  const srcColor = COLOR_NUM[c.m] || "赤";
-
   // 1枚目→リーダースキル行、6枚目→サポートリーダー行（攻撃倍率）
-  if ((slot === 0 || slot === 5) && c.lm && c.lm[1]) {
+  if (slot === 0 || slot === 5) {
     const rowName = slot === 0 ? "リーダースキル" : "サポートリーダー";
     let row = state.rows.find((r) => r.name === rowName);
     if (!row) {
       row = { name: rowName, on: true, cells: Array.from({ length: 6 }, () => ({ m: "", s: "" })) };
       state.rows.unshift(row);
     }
-    state.cards.forEach((cd, j) => {
-      const v = skillRangeMatches(c.lr, srcColor, cd) ? String(c.lm[1]) : "";
-      row.cells[j].m = v;
-      row.cells[j].s = v;
-    });
+    // 再計算用の情報を行に持たせる（リダ倍率がないカードなら解除）
+    row.ls = (c.lm && c.lm[1]) ? { v: c.lm[1], r: c.lr || "", slot } : undefined;
   }
 
-  // エンハンス系スキル: スロットごとに自動行を1つ作る（選び直したら置き換え）
+  // 倍率スキル: スロットごとに自動行を作る（選び直したら置き換え）
   state.rows = state.rows.filter((r) => r.auto !== slot);
-  if (c.e && c.e.v) {
+  for (const s of c.sk || []) {
     state.rows.push({
-      name: `${c.e.k || "エンハンス"}（${c.n}）`,
+      name: `${s.k}（${c.n}）`,
       on: true,
       auto: slot,
-      cells: state.cards.map((cd) => {
-        const v = skillRangeMatches(c.e.r, srcColor, cd) ? String(c.e.v) : "";
-        return { m: v, s: v };
-      }),
+      sk: { v: s.v, r: s.r || "" },
+      cells: [],
+    });
+  }
+  refreshAutoRows();
+}
+
+// 自動入力された行のセルを、今のデッキの属性に合わせて再計算する
+// （カードを選び直したり属性を変えたりしても「同色」などの範囲が正しく反映される）
+function refreshAutoRows() {
+  for (const row of state.rows) {
+    const info = row.sk || row.ls;
+    if (!info) continue;
+    const slot = row.sk ? row.auto : row.ls.slot;
+    const srcColor = state.cards[slot].main;
+    row.cells = state.cards.map((cd, j) => {
+      const hit = info.r === "自身のみ" ? j === slot : skillRangeMatches(info.r, srcColor, cd);
+      const v = hit ? String(info.v) : "";
+      return { m: v, s: v };
     });
   }
 }
@@ -627,6 +623,8 @@ function renderDeck() {
     const mainSel = makeSelect(COLORS, card.main);
     mainSel.addEventListener("change", () => {
       card.main = mainSel.value;
+      refreshAutoRows(); // 「同色」などの範囲を選び直した属性で再計算
+      renderMultTable();
       renderGallery();
       renderResults();
       saveState();
@@ -725,6 +723,7 @@ function renderMultTable() {
     applyBtn.addEventListener("click", () => {
       const v = allInput.value;
       row.cells.forEach((cell) => { cell.m = v; cell.s = v; });
+      delete row.sk; delete row.ls; // 手で入れた値を自動更新で上書きしない
       renderMultTable();
       renderResults();
       saveState();
@@ -745,6 +744,7 @@ function renderMultTable() {
         if (key === "s" && !hasSub) input.disabled = true;
         input.addEventListener("input", () => {
           row.cells[ci][key] = input.value;
+          delete row.sk; delete row.ls; // 手で入れた値を自動更新で上書きしない
           renderResults();
           saveState();
         });
@@ -811,7 +811,7 @@ $("#addRowBtn").addEventListener("click", () => {
 });
 
 $("#resetBtn").addEventListener("click", () => {
-  if (!confirm("入力内容をすべて消してサンプルデータに戻します。よろしいですか？")) return;
+  if (!confirm("入力内容をすべて消して初期状態（空のデッキ）に戻します。よろしいですか？")) return;
   state = sampleState();
   saveState();
   renderAll();
