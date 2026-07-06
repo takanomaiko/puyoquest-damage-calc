@@ -280,6 +280,21 @@ def main():
                 card["ns"] = jpase
             if jplse:
                 card["ls"] = jplse
+            # カード詳細表示用: フルパワー・とくもり・きらめきオーラの効果文
+            fp = strip_wiki(f.get("jpasfe", ""))
+            if fp:
+                card["fp"] = fp
+            ts_texts = []
+            for tk, vk in (("jptse", "tse10"), ("jpts2e", "ts2e10"),
+                           ("jpts3e", "ts3e10"), ("jpkse", "kse10")):
+                raw = f.get(tk, "")
+                if raw:
+                    ts_texts.append(strip_wiki(raw.replace("{{tsparam}}", f.get(vk, "◯"))))
+            if ts_texts:
+                card["ts"] = " ".join(f"{'①②③④'[i2]}{t}" for i2, t in enumerate(ts_texts))
+            ga = strip_wiki(f.get("jpgae", ""))
+            if ga:
+                card["ga"] = ga
             if sk:
                 card["sk"] = sk
             if ail:

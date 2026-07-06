@@ -85,6 +85,10 @@ def main():
             e["ns"] = text
         if kind == "LS" and "ls" not in e and text:
             e["ls"] = text
+        if kind == "TS" and "ts" not in e and text:
+            e["ts"] = text   # とくもりスキル（カード詳細表示用）
+        if kind == "AB" and "ab" not in e and text:
+            e["ab"] = text   # アビリティ（カード詳細表示用）
 
         # リーダースキル倍率 [体力, 攻撃, 回復] とその範囲（列11-14）
         if "lm" not in e:
