@@ -64,6 +64,12 @@
   .gname { font-size: 13px; font-weight: 600; padding: 6px 6px 0; }
   .gdmg { font-size: 16px; color: var(--accent); font-weight: 700; padding: 2px 0 8px; }
   .gclear { position: absolute; top: 6px; right: 6px; }
+  .deck-name {
+    width: 100%; font-size: 22px; font-weight: 700; color: var(--text);
+    border: none; border-bottom: 2px dashed var(--border); border-radius: 0;
+    background: transparent; padding: 2px 4px 6px; margin-bottom: 12px;
+  }
+  .deck-name:focus { outline: none; border-bottom: 2px solid var(--accent); }
   #searchModal { position: fixed; inset: 0; background: rgba(20, 25, 40, .5); display: none; align-items: flex-start; justify-content: center; padding-top: 8vh; z-index: 100; }
   #searchModal.open { display: flex; }
   .sbox { background: #fff; border-radius: 12px; width: min(560px, 92vw); max-height: 74vh; display: flex; flex-direction: column; padding: 14px; }
@@ -72,22 +78,23 @@
   .sitem { display: flex; gap: 10px; align-items: center; padding: 6px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
   .sitem:hover { background: #eef1f8; }
   .sitem img { width: 48px; height: 48px; object-fit: contain; flex: none; }
-  /* スマホ用: ギャラリーを6枚横一列に */
+  /* スマホ用: デッキ名・イラスト・名前・合計ダメージを大きく見せる */
   @media (max-width: 600px) {
     main { padding: 8px; }
     section { padding: 10px 8px; }
-    header h1 { font-size: 13px; }
-    #totalBar { font-size: 12px; }
-    #totalBar strong { font-size: 18px; }
-    #gallery { grid-template-columns: repeat(6, 1fr); gap: 4px; }
-    .gcard { border-radius: 6px; }
+    header h1 { display: none; }
+    #totalBar { font-size: 14px; width: 100%; text-align: center; }
+    #totalBar strong { font-size: 28px; }
+    .deck-name { font-size: 19px; text-align: center; }
+    #gallery { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .gcard { border-radius: 8px; }
     .gimg { height: auto; aspect-ratio: 1 / 1; }
-    .gimg .ph { font-size: 8px; line-height: 1.5; }
-    .gname { font-size: 8px; padding: 2px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .gname .badge { min-width: 0; padding: 0 3px; font-size: 8px; }
-    .gdmg { font-size: 11px; padding: 1px 0 4px; }
-    .gclear { top: 1px; right: 1px; padding: 0 4px; font-size: 9px; line-height: 1.5; opacity: .7; }
-    .hint { font-size: 10px; }
+    .gimg .ph { font-size: 10px; line-height: 1.6; }
+    .gname { font-size: 11px; padding: 4px 4px 0; line-height: 1.3; }
+    .gname .badge { min-width: 0; padding: 0 4px; font-size: 10px; }
+    .gdmg { font-size: 14px; padding: 2px 0 6px; }
+    .gclear { top: 2px; right: 2px; padding: 0 5px; font-size: 10px; line-height: 1.6; opacity: .7; }
+    .hint { display: none; }  /* 説明文は隠してスッキリさせる */
   }
 </style>
 </head>
@@ -101,12 +108,12 @@
 <main>
 
   <section>
-    <h2>カードギャラリー</h2>
-    <p class="hint">
+    <input type="text" id="deckName" class="deck-name" placeholder="デッキ名を入力">
+    <div id="gallery"></div>
+    <p class="hint" style="margin-top:10px">
       枠をクリックすると、お手持ちの画像（スクリーンショットなど）をカードのイラストとして設定できます。<br>
       画像はこのブラウザの中にだけ保存され、外部に送信されることはありません。
     </p>
-    <div id="gallery"></div>
   </section>
 
   <section>
@@ -222,6 +229,7 @@ const STORAGE_KEY = "puyoquest-damage-calc-v1";
 function sampleState() {
   const all = (m, s) => Array.from({ length: 6 }, () => ({ m: String(m), s: String(s) }));
   return {
+    deckName: "セラムン蒸気魔導赤",
     cards: [
       { name: "エターナルセーラームーン", atk: 4963, main: "黄", sub: "青", img: "" },
       { name: "蒸気都市のアミティ",       atk: 7088, main: "赤", sub: "なし", img: "" },
@@ -546,6 +554,10 @@ function renderDeck() {
 }
 
 function renderCommon() {
+  const dn = $("#deckName");
+  dn.value = state.deckName || "";
+  dn.oninput = () => { state.deckName = dn.value; saveState(); };
+
   const ec = $("#enemyColor");
   ec.innerHTML = "";
   COLORS.forEach((c) => ec.appendChild(new Option(c, c, false, c === state.enemyColor)));
