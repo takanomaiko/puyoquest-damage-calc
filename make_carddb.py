@@ -201,6 +201,8 @@ def main():
         with open(nexus_path, encoding="utf-8") as f:
             nexus = json.load(f)
         existing = {(norm(e["n"]), e["r"]) for e in entries.values()}
+        # 同名カードがWikiに複数ある場合、情報量の多いほうを優先する
+        nexus = sorted(nexus, key=lambda c: -len(c))
         for card in nexus:
             key = (norm(card["n"]), card["r"])
             if key in existing:

@@ -161,7 +161,12 @@ def parse_tokumori(f):
         elif "プリズム" in txt and "効果" in txt:
             sk.append({"v": v, "r": "味方全体", "k": "プリズム効果アップ(特盛)", "t": txt})
         elif "クリティカル" in txt and "倍率" in txt:
-            cv = round(1 + v / 100, 3) if v >= 5 else v
+            if "Lv" in txt and "％アップ" in txt.replace("%", "％"):
+                cv = round(1 + (v * 10) / 100, 3)   # 「Lv.×n%」はLv.10換算: 4 → +40% → 1.4倍
+            elif v >= 5:
+                cv = round(1 + v / 100, 3)          # 「40%アップ」→ 1.4倍
+            else:
+                cv = v                               # すでに倍率表記
             sk.append({"v": cv, "r": "味方全体", "k": "クリティカル倍率up(特盛)", "t": txt})
         # 回復・体力系のとくもりはダメージに関係ないので入れない
 
