@@ -1,0 +1,117 @@
+# carddb.js を作り直すプログラム
+#
+# スプレッドシートの「スキルDB」と「ステDB」をダウンロードして、
+# アプリが読み込む carddb.js を生成します。
+#
+# 使い方（ターミナルでこのフォルダに移動してから）:
+#   python3 make_carddb.py
+#
+# ※スプレッドシートが「リンクを知っている全員が閲覧可」になっている必要があります
+
+import csv
+import io
+import json
+import os
+import unicodedata
+import urllib.request
+
+SHEET_ID = "19Na0yv6N2lf-StIXK2Aut0skU1qKw0cYI62xnt1jL3E"
+GID_SKILL = "496870232"  # スキルDB タブ
+GID_STAT = "866290965"   # ステDB タブ
+
+COLOR = {1: "赤", 2: "青", 3: "緑", 4: "黄", 5: "紫"}
+
+
+def norm(name):
+    # 全角/半角・カッコの種類・スペースの違いを吸収してカード名を照合するための正規化
+    return unicodedata.normalize("NFKC", name).replace(" ", "").replace("　", "")
+
+
+def download_csv(gid):
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
+    print(f"ダウンロード中... gid={gid}")
+    with urllib.request.urlopen(url) as res:
+        text = res.read().decode("utf-8")
+    return list(csv.reader(io.StringIO(text)))
+
+
+def main():
+    skill_rows = download_csv(GID_SKILL)[1:]
+    stat_rows = download_csv(GID_STAT)
+
+    # --- スキルDB: (名称, レア度) ごとに1件にまとめる ---
+    entries = {}
+    for r in skill_rows:
+        if len(r) < 30 or not r[1].strip():
+            continue
+        key = (r[1].strip(), r[0].strip())
+        e = entries.setdefault(key, {
+            "n": r[1].strip(),      # 名称
+            "r": r[0].strip(),      # レア度
+            "t": r[5].strip(),      # タイプ
+            "m": int(r[6] or 0),    # 主属性 1-5
+            "s": int(r[7] or 0),    # 副属性 0=なし
+            "u": r[8].strip(),      # 画像URL
+        })
+        kind, text = r[16].strip(), r[29].strip()
+        if kind == "NS" and "ns" not in e and text:
+            e["ns"] = text
+        if kind == "LS" and "ls" not in e and text:
+            e["ls"] = text
+
+    # --- ステDB: 「最大ステータス(とっくん込み)」ブロックから攻撃力などを拾う ---
+    # 列32=名称, 列34=★n, 列35=体力極, 列36=攻撃極, 列37=回復極
+    stats = {}
+    for r in stat_rows:
+        if len(r) > 37 and r[32].strip() and r[34].strip().startswith("★"):
+            name = norm(r[32].strip())
+            star = r[34].strip().lstrip("★")
+            try:
+                stats[(name, star)] = (int(r[35]), int(r[36]), int(r[37]))
+            except ValueError:
+                pass
+
+    # --- ステDB: 「Lv.MAX」ブロックからレア度ごとの素のステータスを拾う ---
+    # 列2,6,10,14,... に「★n」ラベル、その右3列が 体力/攻撃/回復（とっくん分は含まない）
+    lvmax = {}
+    for r in stat_rows:
+        if len(r) > 30 and r[1].strip():
+            name = norm(r[1].strip())
+            for ci in (2, 6, 10, 14, 18, 22, 26):
+                if ci + 3 < len(r) and r[ci].strip().startswith("★"):
+                    star = r[ci].strip().lstrip("★")
+                    try:
+                        lvmax[(name, star)] = (int(r[ci + 1]), int(r[ci + 2]), int(r[ci + 3]))
+                    except ValueError:
+                        pass
+
+    # スキルDBのカードに攻撃力をくっつける
+    # とっくん込み最大値があればそれを優先、なければLv.MAXの素の値（x=1の印つき）
+    matched = matched_lv = 0
+    for (raw_name, star), e in entries.items():
+        name = norm(raw_name)
+        if (name, star) in stats:
+            hp, atk, rec = stats[(name, star)]
+            e["a"] = atk   # 攻撃(とっくん最大)
+            e["h"] = hp    # 体力
+            e["c"] = rec   # 回復
+            matched += 1
+        elif (name, star) in lvmax:
+            hp, atk, rec = lvmax[(name, star)]
+            e["a"] = atk
+            e["h"] = hp
+            e["c"] = rec
+            e["x"] = 1     # とっくん分を含まないLv.MAX値の印
+            matched_lv += 1
+
+    cards = sorted(entries.values(), key=lambda e: (e["n"], e["r"]))
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "carddb.js")
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("const CARD_DB = " + json.dumps(cards, ensure_ascii=False, separators=(",", ":")) + ";\n")
+
+    print(f"完成! カード数: {len(cards)}（とっくん込み攻撃力: {matched}、Lv.MAX素値: {matched_lv}）")
+    print(f"サイズ: {os.path.getsize(out) / 1024 / 1024:.2f} MB → {out}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ぷよクエ ダメージ計算機</title>
+<style>
+  :root {
+    --red: #e74c3c; --blue: #3498db; --green: #27ae60; --yellow: #f1c40f; --purple: #9b59b6;
+    --bg: #f4f6fa; --card-bg: #ffffff; --border: #dde3ec; --text: #2c3e50; --sub: #7f8c9b;
+    --accent: #5b6ee1;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Hiragino Sans", "Yu Gothic", sans-serif; background: var(--bg); color: var(--text); }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--accent); color: #fff; padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  header h1 { font-size: 16px; margin: 0; }
+  #totalBar { font-size: 14px; }
+  #totalBar strong { font-size: 22px; margin-left: 4px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  section {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 16px;
+  }
+  section > h2 { font-size: 15px; margin: 0 0 10px; border-left: 4px solid var(--accent); padding-left: 8px; }
+  .hint { font-size: 12px; color: var(--sub); margin: 4px 0 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 4px 6px; text-align: center; }
+  th { background: #eef1f8; font-weight: 600; }
+  input[type="text"], input[type="number"], select {
+    font-size: 13px; padding: 4px; border: 1px solid var(--border); border-radius: 5px; background: #fff;
+  }
+  input[type="number"] { width: 4.5em; text-align: right; }
+  input.cell { width: 3.8em; }
+  input.cell:disabled { background: #f0f0f0; }
+  input.row-name { width: 11em; }
+  button {
+    font-size: 13px; padding: 5px 12px; border: none; border-radius: 6px;
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button:hover { opacity: .85; }
+  button.small { padding: 2px 8px; font-size: 12px; }
+  button.danger { background: #c0392b; }
+  .scroll { overflow-x: auto; }
+  .badge { display: inline-block; min-width: 2.2em; padding: 1px 6px; border-radius: 4px; color: #fff; font-size: 12px; }
+  .c赤 { background: var(--red); } .c青 { background: var(--blue); } .c緑 { background: var(--green); }
+  .c黄 { background: var(--yellow); color:#333; } .c紫 { background: var(--purple); } .cなし { background: #aaa; }
+  #resultTotals { font-size: 14px; margin-top: 10px; line-height: 1.9; }
+  #resultTotals .big { font-size: 26px; font-weight: 700; color: var(--accent); }
+  .deck-row td:first-child input { width: 13em; }
+  .settings { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 13px; }
+  .settings label { display: flex; align-items: center; gap: 5px; }
+  footer { text-align: center; padding: 10px 0 30px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  #gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .gcard { position: relative; text-align: center; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; }
+  .gimg { height: 230px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: #eef1f8; }
+  .gimg:hover { background: #e2e8f5; }
+  .gimg img { width: 100%; height: 100%; object-fit: contain; }
+  .gimg .ph { color: var(--sub); font-size: 12px; line-height: 1.8; }
+  .gname { font-size: 13px; font-weight: 600; padding: 6px 6px 0; }
+  .gdmg { font-size: 16px; color: var(--accent); font-weight: 700; padding: 2px 0 8px; }
+  .gclear { position: absolute; top: 6px; right: 6px; }
+  #searchModal { position: fixed; inset: 0; background: rgba(20, 25, 40, .5); display: none; align-items: flex-start; justify-content: center; padding-top: 8vh; z-index: 100; }
+  #searchModal.open { display: flex; }
+  .sbox { background: #fff; border-radius: 12px; width: min(560px, 92vw); max-height: 74vh; display: flex; flex-direction: column; padding: 14px; }
+  .sbox > input { width: 100%; font-size: 15px; padding: 8px; }
+  #searchResults { overflow-y: auto; margin-top: 10px; }
+  .sitem { display: flex; gap: 10px; align-items: center; padding: 6px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+  .sitem:hover { background: #eef1f8; }
+  .sitem img { width: 48px; height: 48px; object-fit: contain; flex: none; }
+  /* スマホ用: ギャラリーを6枚横一列に */
+  @media (max-width: 600px) {
+    main { padding: 8px; }
+    section { padding: 10px 8px; }
+    header h1 { font-size: 13px; }
+    #totalBar { font-size: 12px; }
+    #totalBar strong { font-size: 18px; }
+    #gallery { grid-template-columns: repeat(6, 1fr); gap: 4px; }
+    .gcard { border-radius: 6px; }
+    .gimg { height: auto; aspect-ratio: 1 / 1; }
+    .gimg .ph { font-size: 8px; line-height: 1.5; }
+    .gname { font-size: 8px; padding: 2px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gname .badge { min-width: 0; padding: 0 3px; font-size: 8px; }
+    .gdmg { font-size: 11px; padding: 1px 0 4px; }
+    .gclear { top: 1px; right: 1px; padding: 0 4px; font-size: 9px; line-height: 1.5; opacity: .7; }
+    .hint { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ぷよクエ ダメージ計算機</h1>
+  <div id="totalBar">合計ダメージ<strong id="totalBig">-</strong></div>
+</header>
+
+<main>
+
+  <section>
+    <h2>カードギャラリー</h2>
+    <p class="hint">
+      枠をクリックすると、お手持ちの画像（スクリーンショットなど）をカードのイラストとして設定できます。<br>
+      画像はこのブラウザの中にだけ保存され、外部に送信されることはありません。
+    </p>
+    <div id="gallery"></div>
+  </section>
+
+  <section>
+    <h2>デッキ（カード設定）</h2>
+    <p class="hint">カード名・攻撃力・属性を入力します。副属性がないカードは「なし」を選んでください。</p>
+    <div class="scroll">
+      <table id="deckTable">
+        <thead>
+          <tr><th>カード名</th><th>攻撃力</th><th>主属性</th><th>副属性</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>敵・共通設定</h2>
+    <div class="settings">
+      <label>敵の属性
+        <select id="enemyColor"></select>
+      </label>
+      <label>敵の盾
+        <select id="enemyShield"></select>
+      </label>
+      <label>応援デッキ攻撃 +
+        <input type="number" id="supportAtk" step="10">
+      </label>
+      <label>主属性係数
+        <input type="number" id="coefMain" step="1">
+      </label>
+      <label>副属性係数
+        <input type="number" id="coefSub" step="1">
+      </label>
+    </div>
+    <p class="hint">計算式：（攻撃力＋応援）× 係数 × 各倍率 × 属性相性 × 盾。副属性は主属性の1/3（係数3対1）で計算されます。</p>
+  </section>
+
+  <section>
+    <h2>倍率設定</h2>
+    <p class="hint">
+      空欄は「×1（効果なし）」として扱います。行頭のチェックを外すとその行を無視します（ON/OFF比較に便利）。<br>
+      「全体」に数値を入れて「反映」を押すと、その行の全カードに同じ値が入ります。
+    </p>
+    <div class="scroll">
+      <table id="multTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p style="margin-top:10px">
+      <button id="addRowBtn" class="small">＋ 倍率の行を追加</button>
+    </p>
+  </section>
+
+  <section>
+    <h2>計算結果</h2>
+    <div class="scroll">
+      <table id="resultTable">
+        <thead>
+          <tr><th>カード</th><th>相性(主/副)</th><th>主属性ダメージ</th><th>副属性ダメージ</th><th>合計</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="resultTotals"></div>
+  </section>
+
+  <footer>
+    <button id="resetBtn" class="danger">サンプルデータに戻す</button>
+    <p class="hint">入力内容はこのブラウザに自動保存されます。</p>
+  </footer>
+
+</main>
+
+<div id="searchModal">
+  <div class="sbox">
+    <input type="text" id="searchInput" placeholder="カード名の一部を入力（例：アミティ）">
+    <div id="searchResults"></div>
+    <p style="text-align:right; margin:8px 0 0"><button id="searchClose" class="small danger">閉じる</button></p>
+  </div>
+</div>
+
+<script src="carddb.js"></script>
+<script>
+"use strict";
+
+const COLORS = ["赤", "青", "緑", "黄", "紫"];
+const SUB_COLORS = ["なし", ...COLORS];
+
+// 属性相性（攻撃側 → 敵属性 → 倍率、表にないものは1倍）
+const AFFINITY = {
+  赤: { 緑: 2, 青: 0.5 },
+  青: { 赤: 2, 緑: 0.5 },
+  緑: { 青: 2, 赤: 0.5 },
+  黄: { 紫: 2 },
+  紫: { 黄: 2 },
+};
+
+// 盾の種類 → 無効化(×0.01)される属性
+const SHIELDS = {
+  "盾なし": [],
+  "全盾": COLORS,
+  "赤": ["赤"], "青": ["青"], "緑": ["緑"], "黄": ["黄"], "紫": ["紫"],
+  "赤青緑": ["赤", "青", "緑"],
+  "赤黄紫": ["赤", "黄", "紫"],
+  "青黄紫": ["青", "黄", "紫"],
+  "緑黄紫": ["緑", "黄", "紫"],
+};
+
+const STORAGE_KEY = "puyoquest-damage-calc-v1";
+
+// サンプル：セラムン蒸気魔導赤（合計18.24億になるはず）
+function sampleState() {
+  const all = (m, s) => Array.from({ length: 6 }, () => ({ m: String(m), s: String(s) }));
+  return {
+    cards: [
+      { name: "エターナルセーラームーン", atk: 4963, main: "黄", sub: "青", img: "" },
+      { name: "蒸気都市のアミティ",       atk: 7088, main: "赤", sub: "なし", img: "" },
+      { name: "ボダマル",                 atk: 4518, main: "赤", sub: "なし", img: "" },
+      { name: "追憶の天騎士レガムント",   atk: 5990, main: "黄", sub: "青", img: "" },
+      { name: "ラフィソル",               atk: 5645, main: "紫", sub: "青", img: "" },
+      { name: "サタン＆エコロ",           atk: 4990, main: "緑", sub: "紫", img: "" },
+    ],
+    enemyColor: "緑",
+    enemyShield: "盾なし",
+    supportAtk: 500,
+    coefMain: 3,
+    coefSub: 1,
+    rows: [
+      { name: "リーダースキル",        on: true, cells: all(4.5, 4.5) },
+      { name: "サポートリーダー",      on: true, cells: all(5.5, 5.5) },
+      { name: "エンハンス",            on: true, cells: all("", "") },
+      { name: "とっくん攻撃UP",        on: true, cells: [ {m:"",s:""}, {m:"2.5",s:"2.5"}, {m:"2.5",s:"2.5"}, {m:"",s:""}, {m:"",s:""}, {m:"",s:""} ] },
+      { name: "とっくん条件UP(プリボ)", on: true, cells: all(3.6, 3.6) },
+      { name: "とっくん条件UP(体力)",   on: true, cells: all(1.4, 1.4) },
+      { name: "とっくんクリ倍率UP",    on: true, cells: all(1.5, 1.5) },
+      { name: "クリティカル",          on: true, cells: [ {m:"",s:""}, {m:"1.5",s:""}, {m:"1.5",s:""}, {m:"1.5",s:""}, {m:"1.5",s:"1.5"}, {m:"1.5",s:"1.5"} ] },
+      { name: "キラースキル",          on: true, cells: [ {m:"",s:""}, {m:"5",s:"5"}, {m:"",s:""}, {m:"",s:""}, {m:"",s:""}, {m:"",s:""} ] },
+      { name: "ぷよ消し倍率",          on: true, cells: all(9, 9) },
+    ],
+  };
+}
+
+let state = loadState();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* 壊れた保存データは無視してサンプルに戻す */ }
+  return sampleState();
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    alert("保存に失敗しました。設定した画像が大きすぎる可能性があります。画像をいくつか外してみてください。");
+  }
+}
+
+// ---------- 計算 ----------
+
+function affinity(color, enemy) {
+  if (!color || color === "なし") return 0;
+  return (AFFINITY[color] && AFFINITY[color][enemy]) ?? 1;
+}
+
+function shieldMult(color) {
+  if (!color || color === "なし") return 0;
+  return SHIELDS[state.enemyShield].includes(color) ? 0.01 : 1;
+}
+
+function cellValue(str) {
+  const v = parseFloat(str);
+  return isNaN(v) ? 1 : v; // 空欄は×1扱い
+}
+
+function calc() {
+  const results = state.cards.map((card, i) => {
+    const hasSub = card.sub && card.sub !== "なし";
+    const base = (Number(card.atk) || 0) + (Number(state.supportAtk) || 0);
+    let m = base * (Number(state.coefMain) || 0);
+    let s = hasSub ? base * (Number(state.coefSub) || 0) : 0;
+    for (const row of state.rows) {
+      if (!row.on) continue;
+      m *= cellValue(row.cells[i].m);
+      if (hasSub) s *= cellValue(row.cells[i].s);
+    }
+    const affM = affinity(card.main, state.enemyColor);
+    const affS = hasSub ? affinity(card.sub, state.enemyColor) : 0;
+    m *= affM * shieldMult(card.main);
+    s *= affS * (hasSub ? shieldMult(card.sub) : 0);
+    return { m, s, affM, affS, hasSub };
+  });
+  const totalMain = results.reduce((a, r) => a + r.m, 0);
+  const total = results.reduce((a, r) => a + r.m + r.s, 0);
+  return { results, totalMain, total };
+}
+
+// ---------- 表示 ----------
+
+const $ = (sel) => document.querySelector(sel);
+
+function fmt(n) { return Math.round(n).toLocaleString("ja-JP"); }
+function oku(n) { return (n / 1e8).toFixed(2) + "億"; }
+
+function colorBadge(c) { return `<span class="badge c${c}">${c}</span>`; }
+
+function makeSelect(options, value) {
+  const sel = document.createElement("select");
+  for (const o of options) {
+    const op = document.createElement("option");
+    op.value = op.textContent = o;
+    if (o === value) op.selected = true;
+    sel.appendChild(op);
+  }
+  return sel;
+}
+
+// ---------- カードDB検索 ----------
+
+const COLOR_NUM = { 1: "赤", 2: "青", 3: "緑", 4: "黄", 5: "紫" };
+const hasDB = typeof CARD_DB !== "undefined";
+let searchTarget = 0;
+
+function openSearch(i) {
+  searchTarget = i;
+  $("#searchModal").classList.add("open");
+  const input = $("#searchInput");
+  input.value = "";
+  $("#searchResults").innerHTML = `<p class="hint">カード名の一部を入力してください（${CARD_DB.length}件収録）</p>`;
+  input.focus();
+}
+
+function closeSearch() {
+  $("#searchModal").classList.remove("open");
+}
+
+$("#searchClose").addEventListener("click", closeSearch);
+$("#searchModal").addEventListener("click", (e) => {
+  if (e.target.id === "searchModal") closeSearch();
+});
+
+$("#searchInput").addEventListener("input", () => {
+  if (!hasDB) return;
+  const q = $("#searchInput").value.trim();
+  const box = $("#searchResults");
+  box.innerHTML = "";
+  if (!q) return;
+  const hits = CARD_DB.filter((c) => c.n.includes(q)).slice(0, 30);
+  if (hits.length === 0) {
+    box.innerHTML = '<p class="hint">見つかりませんでした</p>';
+    return;
+  }
+  hits.forEach((c) => {
+    const div = document.createElement("div");
+    div.className = "sitem";
+    const main = COLOR_NUM[c.m];
+    const sub = COLOR_NUM[c.s];
+    div.innerHTML =
+      `<img src="${c.u}" alt="" loading="lazy">` +
+      `<div style="text-align:left"><div>★${c.r} ${c.n}</div>` +
+      `<div>${main ? colorBadge(main) : ""}${sub ? colorBadge(sub) : ""} <span class="hint">${c.t || ""}${c.a ? `　攻撃${c.a}${c.x ? "（とっくんなし）" : ""}` : ""}</span></div></div>`;
+    div.addEventListener("click", () => pickCard(c));
+    box.appendChild(div);
+  });
+});
+
+function pickCard(c) {
+  const card = state.cards[searchTarget];
+  card.name = `[★${c.r}] ${c.n}`;
+  card.main = COLOR_NUM[c.m] || "赤";
+  card.sub = COLOR_NUM[c.s] || "なし";
+  card.img = c.u;   // DBの画像URLをそのままイラストに使う
+  if (c.a) card.atk = c.a;   // ステDBの攻撃力（とっくん最大値）
+  card.ns = c.ns || "";
+  card.ls = c.ls || "";
+  closeSearch();
+  renderAll();
+  saveState();
+}
+
+// ---------- カードギャラリー ----------
+
+const filePicker = document.createElement("input");
+filePicker.type = "file";
+filePicker.accept = "image/*";
+let pickerTarget = 0;
+filePicker.addEventListener("change", () => {
+  const file = filePicker.files[0];
+  filePicker.value = "";
+  if (!file) return;
+  shrinkImage(file, (dataUrl) => {
+    state.cards[pickerTarget].img = dataUrl;
+    renderGallery();
+    renderResults();
+    saveState();
+  });
+});
+
+// localStorage(約5MB)に収まるよう、画像を縮小してから保存する
+function shrinkImage(file, cb) {
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 400;
+    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(img.src);
+    cb(canvas.toDataURL("image/png"));
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function renderGallery() {
+  const box = $("#gallery");
+  box.innerHTML = "";
+  state.cards.forEach((card, i) => {
+    const div = document.createElement("div");
+    div.className = "gcard";
+
+    const imgBox = document.createElement("div");
+    imgBox.className = "gimg";
+    imgBox.title = "クリックして画像を選択";
+    if (card.img) {
+      const img = document.createElement("img");
+      img.src = card.img;
+      img.alt = card.name;
+      imgBox.appendChild(img);
+    } else {
+      imgBox.innerHTML = `<span class="ph">クリックして<br>イラストを設定</span>`;
+    }
+    imgBox.addEventListener("click", () => {
+      pickerTarget = i;
+      filePicker.click();
+    });
+    div.appendChild(imgBox);
+
+    if (card.img) {
+      const clearBtn = document.createElement("button");
+      clearBtn.textContent = "×";
+      clearBtn.className = "small danger gclear";
+      clearBtn.title = "画像を外す";
+      clearBtn.addEventListener("click", () => {
+        card.img = "";
+        renderGallery();
+        saveState();
+      });
+      div.appendChild(clearBtn);
+    }
+
+    const hasSub = card.sub && card.sub !== "なし";
+    const name = document.createElement("div");
+    name.className = "gname";
+    name.innerHTML = `${colorBadge(card.main)}${hasSub ? colorBadge(card.sub) : ""} ${card.name || "（無名）"}`;
+    // DBから選んだカードは、名前にマウスを乗せるとスキル文が見られる
+    if (card.ns || card.ls) {
+      name.title = (card.ls ? `【リーダースキル】${card.ls}\n` : "") + (card.ns ? `【スキル】${card.ns}` : "");
+    }
+
+    const dmg = document.createElement("div");
+    dmg.className = "gdmg";
+    dmg.textContent = "-";
+
+    div.append(name, dmg);
+    box.appendChild(div);
+  });
+}
+
+function renderDeck() {
+  const tbody = $("#deckTable tbody");
+  tbody.innerHTML = "";
+  state.cards.forEach((card, i) => {
+    const tr = document.createElement("tr");
+    tr.className = "deck-row";
+
+    const tdName = document.createElement("td");
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = card.name;
+    nameInput.addEventListener("input", () => {
+      card.name = nameInput.value;
+      updateMultHeader();
+      renderGallery();
+      renderResults();
+      saveState();
+    });
+    tdName.appendChild(nameInput);
+    if (hasDB) {
+      const searchBtn = document.createElement("button");
+      searchBtn.textContent = "検索";
+      searchBtn.className = "small";
+      searchBtn.style.marginLeft = "4px";
+      searchBtn.title = "カードDBから選ぶ";
+      searchBtn.addEventListener("click", () => openSearch(i));
+      tdName.appendChild(searchBtn);
+    }
+
+    const tdAtk = document.createElement("td");
+    const atkInput = document.createElement("input");
+    atkInput.type = "number";
+    atkInput.value = card.atk;
+    atkInput.addEventListener("input", () => {
+      card.atk = Number(atkInput.value) || 0;
+      renderResults();
+      saveState();
+    });
+    tdAtk.appendChild(atkInput);
+
+    const tdMain = document.createElement("td");
+    const mainSel = makeSelect(COLORS, card.main);
+    mainSel.addEventListener("change", () => {
+      card.main = mainSel.value;
+      renderGallery();
+      renderResults();
+      saveState();
+    });
+    tdMain.appendChild(mainSel);
+
+    const tdSub = document.createElement("td");
+    const subSel = makeSelect(SUB_COLORS, card.sub);
+    subSel.addEventListener("change", () => {
+      card.sub = subSel.value;
+      renderMultTable(); // 副属性の有無で入力欄の有効/無効が変わる
+      renderGallery();
+      renderResults();
+      saveState();
+    });
+    tdSub.appendChild(subSel);
+
+    tr.append(tdName, tdAtk, tdMain, tdSub);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCommon() {
+  const ec = $("#enemyColor");
+  ec.innerHTML = "";
+  COLORS.forEach((c) => ec.appendChild(new Option(c, c, false, c === state.enemyColor)));
+  ec.onchange = () => { state.enemyColor = ec.value; renderResults(); saveState(); };
+
+  const es = $("#enemyShield");
+  es.innerHTML = "";
+  Object.keys(SHIELDS).forEach((s) => es.appendChild(new Option(s, s, false, s === state.enemyShield)));
+  es.onchange = () => { state.enemyShield = es.value; renderResults(); saveState(); };
+
+  for (const [id, key] of [["#supportAtk", "supportAtk"], ["#coefMain", "coefMain"], ["#coefSub", "coefSub"]]) {
+    const el = $(id);
+    el.value = state[key];
+    el.oninput = () => { state[key] = Number(el.value) || 0; renderResults(); saveState(); };
+  }
+}
+
+function updateMultHeader() {
+  const thead = $("#multTable thead");
+  thead.innerHTML = "";
+  const tr1 = document.createElement("tr");
+  tr1.innerHTML =
+    `<th rowspan="2">ON</th><th rowspan="2">倍率の名前</th><th rowspan="2">全体</th>` +
+    state.cards.map((c) => `<th colspan="2">${c.name || "（無名）"}</th>`).join("") +
+    `<th rowspan="2"></th>`;
+  const tr2 = document.createElement("tr");
+  tr2.innerHTML = state.cards.map(() => `<th>主</th><th>副</th>`).join("");
+  thead.append(tr1, tr2);
+}
+
+function renderMultTable() {
+  updateMultHeader();
+  const tbody = $("#multTable tbody");
+  tbody.innerHTML = "";
+
+  state.rows.forEach((row, ri) => {
+    const tr = document.createElement("tr");
+
+    const tdOn = document.createElement("td");
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = row.on;
+    chk.addEventListener("change", () => { row.on = chk.checked; renderResults(); saveState(); });
+    tdOn.appendChild(chk);
+
+    const tdName = document.createElement("td");
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "row-name";
+    nameInput.value = row.name;
+    nameInput.addEventListener("input", () => { row.name = nameInput.value; saveState(); });
+    tdName.appendChild(nameInput);
+
+    const tdAll = document.createElement("td");
+    const allInput = document.createElement("input");
+    allInput.type = "number";
+    allInput.className = "cell";
+    allInput.step = "0.1";
+    const applyBtn = document.createElement("button");
+    applyBtn.textContent = "反映";
+    applyBtn.className = "small";
+    applyBtn.addEventListener("click", () => {
+      const v = allInput.value;
+      row.cells.forEach((cell) => { cell.m = v; cell.s = v; });
+      renderMultTable();
+      renderResults();
+      saveState();
+    });
+    tdAll.append(allInput, document.createTextNode(" "), applyBtn);
+
+    tr.append(tdOn, tdName, tdAll);
+
+    state.cards.forEach((card, ci) => {
+      const hasSub = card.sub && card.sub !== "なし";
+      for (const key of ["m", "s"]) {
+        const td = document.createElement("td");
+        const input = document.createElement("input");
+        input.type = "number";
+        input.className = "cell";
+        input.step = "0.1";
+        input.value = row.cells[ci][key];
+        if (key === "s" && !hasSub) input.disabled = true;
+        input.addEventListener("input", () => {
+          row.cells[ci][key] = input.value;
+          renderResults();
+          saveState();
+        });
+        td.appendChild(input);
+        tr.appendChild(td);
+      }
+    });
+
+    const tdDel = document.createElement("td");
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "×";
+    delBtn.className = "small danger";
+    delBtn.title = "この行を削除";
+    delBtn.addEventListener("click", () => {
+      if (!confirm(`「${row.name}」の行を削除しますか？`)) return;
+      state.rows.splice(ri, 1);
+      renderMultTable();
+      renderResults();
+      saveState();
+    });
+    tdDel.appendChild(delBtn);
+    tr.appendChild(tdDel);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function renderResults() {
+  const { results, totalMain, total } = calc();
+  const tbody = $("#resultTable tbody");
+  tbody.innerHTML = "";
+  state.cards.forEach((card, i) => {
+    const r = results[i];
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td style="text-align:left">${colorBadge(card.main)}${r.hasSub ? colorBadge(card.sub) : ""} ${card.name || "（無名）"}</td>` +
+      `<td>×${r.affM}${r.hasSub ? ` / ×${r.affS}` : ""}</td>` +
+      `<td class="num">${fmt(r.m)}</td>` +
+      `<td class="num">${r.hasSub ? fmt(r.s) : "-"}</td>` +
+      `<td class="num"><strong>${fmt(r.m + r.s)}</strong></td>`;
+    tbody.appendChild(tr);
+  });
+  $("#resultTotals").innerHTML =
+    `主属性のみ合計：${fmt(totalMain)}（${oku(totalMain)}）<br>` +
+    `総合計：<span class="big">${oku(total)}</span>（${fmt(total)}）`;
+  $("#totalBig").textContent = oku(total);
+  // ギャラリーのダメージ表示も更新
+  document.querySelectorAll("#gallery .gdmg").forEach((el, i) => {
+    if (results[i]) el.textContent = oku(results[i].m + results[i].s);
+  });
+}
+
+// ---------- ボタン ----------
+
+$("#addRowBtn").addEventListener("click", () => {
+  state.rows.push({
+    name: "新しい倍率",
+    on: true,
+    cells: Array.from({ length: 6 }, () => ({ m: "", s: "" })),
+  });
+  renderMultTable();
+  renderResults();
+  saveState();
+});
+
+$("#resetBtn").addEventListener("click", () => {
+  if (!confirm("入力内容をすべて消してサンプルデータに戻します。よろしいですか？")) return;
+  state = sampleState();
+  saveState();
+  renderAll();
+});
+
+function renderAll() {
+  renderGallery();
+  renderDeck();
+  renderCommon();
+  renderMultTable();
+  renderResults();
+}
+
+renderAll();
+</script>
+</body>
+</html>
