@@ -103,6 +103,31 @@ def strip_wiki(s):
     return s.strip()
 
 
+def classify_enhance(text):
+    """分類表（条件付きエンハンス等の区分）に基づいてエンハンスの分類名を決める"""
+    if "隣接" in text:
+        return "攻撃エンハ(隣接)"  # 分類表に該当なし（ユーザーに分類を確認中）
+    if "攻撃値" in text and "等倍" in text:
+        return "攻撃値up&副属性等倍化"
+    if "ブーストエリア" in text:
+        return "ブーストエリア"
+    if re.search(r"属性以上の?(?:同時)?攻撃|属性以上で", text):
+        return "n属性以上の同時攻撃"
+    if "属性以下" in text:
+        return "n属性以下の同時攻撃"
+    if "属性を含む攻撃" in text:
+        return "〇属性を含む攻撃"
+    if "連鎖以上" in text:
+        return "n連鎖以上"
+    if "全消し" in text and "チャンス" in text:
+        return "大連鎖チャンス全消し"
+    if re.search(r"個以上.{0,8}消", text):
+        return "n個以上の同時消し"
+    if "自属性のみ" in text:
+        return "自属性のみで攻撃"
+    return "攻撃エンハ"
+
+
 def parse_skills(jpase, jplse):
     """日本語の効果文から、ダメージ倍率を簡易判定する（Wiki自動判定）"""
     sk = []
@@ -123,10 +148,18 @@ def parse_skills(jpase, jplse):
             v = float(num)
             vals.append(v if unit == "倍" else round(1 + v / 100, 3))
         if vals and min(vals) > 1:
-            sk.append({"v": min(vals), "r": color_range(jpase), "k": "攻撃エンハ", "t": jpase})
+            k = classify_enhance(jpase)
+            # 「隣接」は誰に掛かるか配置次第なので、確実な自分の列にだけ入れる
+            r = "自身のみ" if k == "攻撃エンハ(隣接)" else color_range(jpase)
+            sk.append({"v": min(vals), "r": r, "k": k, "t": jpase})
         m = re.search(r"受けるダメージを([\d.]+)倍", jpase)
         if m and float(m.group(1)) > 1:
             sk.append({"v": float(m.group(1)), "r": "味方全体", "k": "被ダメアップ", "t": jpase})
+        # 「与えるダメージを〜最大n%アップ」型（回数条件など）は最大値で入れる
+        m = re.search(r"与えるダメージを.*?最大([\d.]+)[%％]", jpase)
+        if m and float(m.group(1)) > 0:
+            sk.append({"v": round(1 + float(m.group(1)) / 100, 3), "r": "味方全体",
+                       "k": "与ダメアップ", "t": jpase})
         if "解除" not in jpase:
             for name, v in AILMENTS.items():
                 if name in jpase:
@@ -176,12 +209,17 @@ def parse_tokumori(f):
                 v = round(1 + v * 10 / 100, 3)   # 「Lv.×n%」はLv.10換算
             elif pct:
                 v = round(1 + v / 100, 3)
+            # 分類表のサポートスキル分類（特盛の条件別）に合わせる
             if "ブーストエリア" in txt:
                 k = "ブーストエリア強化(特盛)"
             elif "体力MAX" in txt:
                 k = "攻撃エンハ(特盛体力MAX)"
+            elif "フィールド効果" in txt:
+                k = "攻撃エンハ(特盛フィールド条件)"
+            elif "控え含む" in txt:
+                k = "攻撃エンハ(特盛控え含む)"
             else:
-                k = "攻撃エンハ(特盛)"
+                k = "攻撃エンハ(特盛無条件)"
             sk.append({"v": v, "r": color_range(txt), "k": k, "t": txt})
         elif "プリズム" in txt and "効果" in txt:
             sk.append({"v": v, "r": "味方全体", "k": "プリズム効果アップ(特盛)", "t": txt})
