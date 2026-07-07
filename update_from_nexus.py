@@ -106,7 +106,7 @@ def strip_wiki(s):
 def classify_enhance(text):
     """分類表（条件付きエンハンス等の区分）に基づいてエンハンスの分類名を決める"""
     if "隣接" in text:
-        return "攻撃エンハ(隣接)"  # 分類表に該当なし（ユーザーに分類を確認中）
+        return "攻撃エンハ(隣接)"  # 新分類（ユーザー確認済み: 自身+隣のカードに適用）
     if "攻撃値" in text and "等倍" in text:
         return "攻撃値up&副属性等倍化"
     if "ブーストエリア" in text:
@@ -149,8 +149,8 @@ def parse_skills(jpase, jplse):
             vals.append(v if unit == "倍" else round(1 + v / 100, 3))
         if vals and min(vals) > 1:
             k = classify_enhance(jpase)
-            # 「隣接」は誰に掛かるか配置次第なので、確実な自分の列にだけ入れる
-            r = "自身のみ" if k == "攻撃エンハ(隣接)" else color_range(jpase)
+            # 「隣接」はデッキの並びで自身と隣のカードに適用（アプリ側で判定）
+            r = "隣接" if k == "攻撃エンハ(隣接)" else color_range(jpase)
             sk.append({"v": min(vals), "r": r, "k": k, "t": jpase})
         m = re.search(r"受けるダメージを([\d.]+)倍", jpase)
         if m and float(m.group(1)) > 1:

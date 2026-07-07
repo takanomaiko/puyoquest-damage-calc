@@ -601,7 +601,10 @@ function refreshAutoRows() {
     const slot = row.sk ? row.auto : row.ls.slot;
     const srcColor = state.cards[slot].main;
     row.cells = state.cards.map((cd, j) => {
-      const hit = info.r === "自身のみ" ? j === slot : skillRangeMatches(info.r, srcColor, cd);
+      let hit;
+      if (info.r === "自身のみ") hit = j === slot;
+      else if (info.r === "隣接") hit = Math.abs(j - slot) <= 1; // 自身とデッキの並びで隣のカード
+      else hit = skillRangeMatches(info.r, srcColor, cd);
       const v = hit ? String(info.v) : "";
       return { m: v, s: v };
     });
