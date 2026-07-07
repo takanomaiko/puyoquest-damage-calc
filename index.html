@@ -922,12 +922,30 @@ function updateMultHeader() {
   thead.innerHTML = "";
   const tr1 = document.createElement("tr");
   tr1.innerHTML =
-    `<th rowspan="2">倍率の名前</th><th rowspan="2">ON</th><th rowspan="2">全体</th>` +
+    `<th rowspan="2">倍率の名前 ⇅</th><th rowspan="2">ON</th><th rowspan="2">全体</th>` +
     state.cards.map((c) => `<th colspan="2">${c.name || "（無名）"}</th>`).join("") +
     `<th rowspan="2"></th>`;
+  const nameTh = tr1.querySelector("th");
+  nameTh.style.cursor = "pointer";
+  nameTh.title = "クリックで並べ替え（同じ種類の倍率が隣に並び、重ねがけに気づけます）";
+  nameTh.addEventListener("click", sortMultRows);
   const tr2 = document.createElement("tr");
   tr2.innerHTML = state.cards.map(() => `<th>主</th><th>副</th>`).join("");
   thead.append(tr1, tr2);
+}
+
+// 倍率行を名前順に並べ替える（同じ枠の効果＝重複できないものが隣に並ぶ）
+// リーダースキルとサポートリーダーは常に一番上に固定
+let multSortAsc = true;
+function sortMultRows() {
+  const pinnedNames = ["リーダースキル", "サポートリーダー"];
+  const pinned = state.rows.filter((r) => pinnedNames.includes(r.name));
+  const rest = state.rows.filter((r) => !pinnedNames.includes(r.name));
+  rest.sort((a, b) => (multSortAsc ? 1 : -1) * a.name.localeCompare(b.name, "ja"));
+  multSortAsc = !multSortAsc;
+  state.rows = [...pinned, ...rest];
+  renderMultTable();
+  saveState();
 }
 
 function renderMultTable() {
