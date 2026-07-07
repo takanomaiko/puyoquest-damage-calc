@@ -118,6 +118,8 @@
   /* モーダル共通 */
   .modal { position: fixed; inset: 0; background: rgba(20,25,40,.55); display: none; align-items: flex-start; justify-content: center; padding: 6vh 12px 12px; z-index: 100; }
   .modal.open { display: flex; }
+  /* 検索・スキル・詳細はカード編集ウィンドウの上に重ねて表示する */
+  #searchModal, #skillModal, #cardModal { z-index: 120; }
   .sbox { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; max-height: 82vh; display: flex; flex-direction: column; padding: 14px; overflow-y: auto; }
   .sbox > input.search { width: 100%; font-size: 16px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; }
   #searchResults { overflow-y: auto; margin-top: 8px; }
