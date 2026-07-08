@@ -355,13 +355,17 @@ function cellValue(str) {
 function calc() {
   const results = state.cards.map((card, i) => {
     const hasSub = card.sub && card.sub !== "なし";
-    // タワーボーナス・応援デッキは、そのカードの主属性の色に対応する設定を使う
-    const cc = (state.colorConfig && state.colorConfig[card.main]) || {};
-    const towerMult = Number(cc.tower) || 1;
-    const supportBonus = Number(cc[state.statType || "atk"]) || 0;
-    const base = ((Number(card[state.statType || "atk"]) || 0) + supportBonus) * towerMult;
-    let m = base * COEF_MAIN;
-    let s = hasSub ? base * COEF_SUB : 0;
+    const rawStat = Number(card[state.statType || "atk"]) || 0;
+    // タワーボーナス・応援デッキは、主属性ダメージには主属性の色、
+    // 副属性ダメージには副属性の色の設定をそれぞれ使う（属性相性・盾と同じ考え方）
+    const calcBase = (color) => {
+      const cc = (state.colorConfig && state.colorConfig[color]) || {};
+      const towerMult = Number(cc.tower) || 1;
+      const supportBonus = Number(cc[state.statType || "atk"]) || 0;
+      return (rawStat + supportBonus) * towerMult;
+    };
+    let m = calcBase(card.main) * COEF_MAIN;
+    let s = hasSub ? calcBase(card.sub) * COEF_SUB : 0;
     for (const row of state.rows) {
       if (!row.on) continue;
       m *= cellValue(row.cells[i].m);
