@@ -194,7 +194,7 @@
     </div>
     <div class="setcard">
       <h3>タワーボーナス・応援デッキ</h3>
-      <p class="note" style="margin:0 0 8px">色ごとに設定します。カードの主属性に対応する行が自動で使われます（タワーボーナスの初期値は3倍）。</p>
+      <p class="note" style="margin:0 0 8px">色ごとに設定します。カードの主属性に対応する行が自動で使われます（タワーボーナスの初期値は3倍（MAX）です）。</p>
       <div class="scroll">
         <table id="colorConfigTable">
           <thead>
@@ -294,8 +294,8 @@ const STORAGE_KEY = "puyoquest-damage-calc-v1";
 const COLOR_NUM = { 1: "赤", 2: "青", 3: "緑", 4: "黄", 5: "紫" };
 const hasDB = typeof CARD_DB !== "undefined";
 
-// タワーボーナス・応援デッキは色ごとの設定（一度設定したら動かさないことが多いので、
-// タワーボーナスの初期値は3倍にしてある）
+// タワーボーナス・応援デッキは色ごとの設定
+// （タワーボーナスの初期値は3倍（MAX）。最大値も3倍で頭打ちにする）
 function defaultColorConfig() {
   const cfg = {};
   COLORS.forEach((c) => { cfg[c] = { tower: 3, hp: 0, atk: 500, rcv: 0 }; });
@@ -794,8 +794,11 @@ function renderColorConfig() {
     const towerInput = document.createElement("input");
     towerInput.type = "number";
     towerInput.step = "0.001";
+    towerInput.min = "0";
+    towerInput.max = "3";
     towerInput.value = cc.tower;
     towerInput.addEventListener("input", () => {
+      if (Number(towerInput.value) > 3) towerInput.value = "3"; // タワーボーナスの上限は3倍
       cc.tower = Number(towerInput.value) || 0;
       renderHeader();
       saveState();
