@@ -60,6 +60,7 @@
   #resultTotals .big { font-size: 26px; font-weight: 700; color: var(--accent); }
   .deck-row td:first-child input { width: 13em; }
   th.statActive, td.statActive { background: #e3ecff; }
+  #colorConfigTable input[type="number"] { width: 5em; text-align: right; }
   .deck-row td.statActive input { background: #eef3ff; font-weight: 700; }
   .settings { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 13px; }
   .settings label { display: flex; align-items: center; gap: 5px; }
@@ -213,14 +214,24 @@
       <label>敵の盾
         <select id="enemyShield"></select>
       </label>
-      <label id="supportAtkLabel">応援デッキ攻撃 +
-        <input type="number" id="supportAtk" step="10">
-      </label>
       <label>属性係数（固定値）
         <span style="font-weight:600">主属性 ×1／副属性 ×1/3</span>
       </label>
     </div>
-    <p class="hint" id="calcHint">計算式：（攻撃力＋応援）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。</p>
+    <p class="hint" id="calcHint">計算式：（ステータス×タワーボーナス＋応援デッキ）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。</p>
+  </section>
+
+  <section>
+    <h2>タワーボーナス・応援デッキ</h2>
+    <p class="hint">色ごとに設定します。各カードは自分の主属性に対応する行の値が自動で使われます（タワーボーナスは一度設定したら動かさないことが多いので、初期値は3倍にしてあります）。</p>
+    <div class="scroll">
+      <table id="colorConfigTable">
+        <thead>
+          <tr><th>色</th><th>タワーボーナス</th><th id="ccHp">応援 体力</th><th id="ccAtk">応援 攻撃</th><th id="ccRcv">応援 回復</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
   <section>
@@ -319,6 +330,14 @@ const SHIELDS = {
 
 const STORAGE_KEY = "puyoquest-damage-calc-v1";
 
+// タワーボーナス・応援デッキは色ごとの設定（一度設定したら動かさないことが多いので、
+// タワーボーナスの初期値は3倍にしてある）
+function defaultColorConfig() {
+  const cfg = {};
+  COLORS.forEach((c) => { cfg[c] = { tower: 3, hp: 0, atk: 500, rcv: 0 }; });
+  return cfg;
+}
+
 // 初期状態：空のデッキ＋リーダー/サポートの2行だけ
 // （その他の倍率行は、カードを検索で選んだときにスキルから自動で追加される）
 function sampleState() {
@@ -329,7 +348,7 @@ function sampleState() {
     enemyColor: "緑",
     enemyShield: "盾なし",
     statType: "atk",
-    supportAtk: 500,
+    colorConfig: defaultColorConfig(),
     rows: [
       { name: "リーダースキル",   on: true, cells: emptyCells() },
       { name: "サポートリーダー", on: true, cells: emptyCells() },
@@ -342,7 +361,16 @@ let state = loadState();
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const st = JSON.parse(raw);
+      if (!st.colorConfig) {
+        // 旧バージョン（応援デッキが色区別のない単一の数値だった頃）からの移行
+        const atkDefault = Number(st.supportAtk) || 500;
+        st.colorConfig = defaultColorConfig();
+        COLORS.forEach((c) => { st.colorConfig[c].atk = atkDefault; });
+      }
+      return st;
+    }
   } catch (e) { /* 壊れた保存データは無視してサンプルに戻す */ }
   return sampleState();
 }
@@ -375,7 +403,11 @@ function cellValue(str) {
 function calc() {
   const results = state.cards.map((card, i) => {
     const hasSub = card.sub && card.sub !== "なし";
-    const base = (Number(card[state.statType || "atk"]) || 0) + (Number(state.supportAtk) || 0);
+    // タワーボーナス・応援デッキは、そのカードの主属性の色に対応する設定を使う
+    const cc = (state.colorConfig && state.colorConfig[card.main]) || {};
+    const towerMult = Number(cc.tower) || 1;
+    const supportBonus = Number(cc[state.statType || "atk"]) || 0;
+    const base = (Number(card[state.statType || "atk"]) || 0) * towerMult + supportBonus;
     let m = base * COEF_MAIN;
     let s = hasSub ? base * COEF_SUB : 0;
     for (const row of state.rows) {
@@ -993,14 +1025,63 @@ function updateDeckTitle() {
   if (el) el.textContent = state.deckName || "";
 }
 
-// 選択中のステータスに合わせてラベルと計算式ヒントを更新する
+// 選択中のステータスに合わせてヒント文と、タワーボーナス表のハイライト列を更新する
 function updateStatLabels() {
   const names = { atk: "攻撃", hp: "体力", rcv: "回復" };
   const label = names[state.statType] || "攻撃";
-  const labelEl = $("#supportAtkLabel");
-  if (labelEl) labelEl.childNodes[0].textContent = `応援デッキ${label} +`;
   const hint = $("#calcHint");
-  if (hint) hint.textContent = `計算式：（${label}＋応援）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。`;
+  if (hint) hint.textContent = `計算式：（${label}×タワーボーナス＋応援デッキ）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。`;
+  document.querySelectorAll("#ccHp, #ccAtk, #ccRcv, .cc-hp, .cc-atk, .cc-rcv")
+    .forEach((el) => el.classList.remove("statActive"));
+  const idMap = { atk: "#ccAtk", hp: "#ccHp", rcv: "#ccRcv" };
+  $(idMap[state.statType] || "#ccAtk")?.classList.add("statActive");
+  document.querySelectorAll(`.cc-${state.statType || "atk"}`).forEach((el) => el.classList.add("statActive"));
+}
+
+// タワーボーナス・応援デッキの色ごとの設定テーブルを描画する
+function renderColorConfig() {
+  const tbody = $("#colorConfigTable tbody");
+  tbody.innerHTML = "";
+  COLORS.forEach((color) => {
+    const cc = state.colorConfig[color];
+    const tr = document.createElement("tr");
+
+    const tdColor = document.createElement("td");
+    tdColor.innerHTML = colorBadge(color);
+    tr.appendChild(tdColor);
+
+    const tdTower = document.createElement("td");
+    const towerInput = document.createElement("input");
+    towerInput.type = "number";
+    towerInput.step = "0.001";
+    towerInput.value = cc.tower;
+    towerInput.addEventListener("input", () => {
+      cc.tower = Number(towerInput.value) || 0;
+      renderResults();
+      saveState();
+    });
+    tdTower.append(towerInput, document.createTextNode(" 倍"));
+    tr.appendChild(tdTower);
+
+    for (const key of ["hp", "atk", "rcv"]) {
+      const td = document.createElement("td");
+      td.className = `cc-${key}`;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.step = "10";
+      input.value = cc[key];
+      input.addEventListener("input", () => {
+        cc[key] = Number(input.value) || 0;
+        renderResults();
+        saveState();
+      });
+      td.appendChild(input);
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  });
+  updateStatLabels();
 }
 
 function renderCommon() {
@@ -1030,11 +1111,7 @@ function renderCommon() {
   Object.keys(SHIELDS).forEach((s) => es.appendChild(new Option(s, s, false, s === state.enemyShield)));
   es.onchange = () => { state.enemyShield = es.value; renderResults(); saveState(); };
 
-  for (const [id, key] of [["#supportAtk", "supportAtk"]]) {
-    const el = $(id);
-    el.value = state[key];
-    el.oninput = () => { state[key] = Number(el.value) || 0; renderResults(); saveState(); };
-  }
+  renderColorConfig();
 }
 
 function updateMultHeader() {

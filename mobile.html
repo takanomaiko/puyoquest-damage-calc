@@ -79,6 +79,12 @@
   }
   .gcombo.on { filter: none; opacity: 1; background: #fff8dc; box-shadow: 0 0 10px 3px rgba(255,200,40,.9); }
   .note { font-size: 11px; color: var(--sub); text-align: center; margin: 10px 0; }
+  .scroll { overflow-x: auto; }
+  #colorConfigTable { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #colorConfigTable th, #colorConfigTable td { border: 1px solid var(--border); padding: 5px 6px; text-align: center; white-space: nowrap; }
+  #colorConfigTable th { background: #eef1f8; font-weight: 600; }
+  #colorConfigTable input[type="number"] { width: 4.2em; text-align: right; font-size: 12px; padding: 4px; }
+  th.statActive, td.statActive { background: #e3ecff; }
 
   /* 倍率リスト */
   .multbar { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -184,8 +190,19 @@
     <div class="setcard">
       <h3>敵の盾・共通設定</h3>
       <div class="setline">盾 <select id="enemyShield"></select></div>
-      <div class="setline" id="supportAtkLine">応援デッキ攻撃 + <input type="number" id="supportAtk" step="10"></div>
       <div class="setline">属性係数（固定値）<strong>主属性 ×1／副属性 ×1/3</strong></div>
+    </div>
+    <div class="setcard">
+      <h3>タワーボーナス・応援デッキ</h3>
+      <p class="note" style="margin:0 0 8px">色ごとに設定します。カードの主属性に対応する行が自動で使われます（タワーボーナスの初期値は3倍）。</p>
+      <div class="scroll">
+        <table id="colorConfigTable">
+          <thead>
+            <tr><th>色</th><th>タワー</th><th id="ccHp">体力</th><th id="ccAtk">攻撃</th><th id="ccRcv">回復</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
     <div class="setcard">
       <h3>その他</h3>
@@ -277,13 +294,21 @@ const STORAGE_KEY = "puyoquest-damage-calc-v1";
 const COLOR_NUM = { 1: "赤", 2: "青", 3: "緑", 4: "黄", 5: "紫" };
 const hasDB = typeof CARD_DB !== "undefined";
 
+// タワーボーナス・応援デッキは色ごとの設定（一度設定したら動かさないことが多いので、
+// タワーボーナスの初期値は3倍にしてある）
+function defaultColorConfig() {
+  const cfg = {};
+  COLORS.forEach((c) => { cfg[c] = { tower: 3, hp: 0, atk: 500, rcv: 0 }; });
+  return cfg;
+}
+
 function sampleState() {
   const emptyCells = () => Array.from({ length: 6 }, () => ({ m: "", s: "" }));
   return {
     deckName: "",
     cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, hp: 0, rcv: 0, main: "赤", sub: "なし", img: "", combo: false })),
     enemyColor: "緑", enemyShield: "盾なし", statType: "atk",
-    supportAtk: 500,
+    colorConfig: defaultColorConfig(),
     rows: [
       { name: "リーダースキル", on: true, cells: emptyCells() },
       { name: "サポートリーダー", on: true, cells: emptyCells() },
@@ -294,7 +319,16 @@ let state = loadState();
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const st = JSON.parse(raw);
+      if (!st.colorConfig) {
+        // 旧バージョン（応援デッキが色区別のない単一の数値だった頃）からの移行
+        const atkDefault = Number(st.supportAtk) || 500;
+        st.colorConfig = defaultColorConfig();
+        COLORS.forEach((c) => { st.colorConfig[c].atk = atkDefault; });
+      }
+      return st;
+    }
   } catch (e) { /* 壊れた保存データは無視 */ }
   return sampleState();
 }
@@ -321,7 +355,11 @@ function cellValue(str) {
 function calc() {
   const results = state.cards.map((card, i) => {
     const hasSub = card.sub && card.sub !== "なし";
-    const base = (Number(card[state.statType || "atk"]) || 0) + (Number(state.supportAtk) || 0);
+    // タワーボーナス・応援デッキは、そのカードの主属性の色に対応する設定を使う
+    const cc = (state.colorConfig && state.colorConfig[card.main]) || {};
+    const towerMult = Number(cc.tower) || 1;
+    const supportBonus = Number(cc[state.statType || "atk"]) || 0;
+    const base = (Number(card[state.statType || "atk"]) || 0) * towerMult + supportBonus;
     let m = base * COEF_MAIN;
     let s = hasSub ? base * COEF_SUB : 0;
     for (const row of state.rows) {
@@ -730,13 +768,60 @@ $("#addRowBtn").addEventListener("click", () => {
 
 // 選択中のステータスに合わせてラベル類を更新
 function updateStatLabels() {
-  const names = { atk: "攻撃", hp: "体力", rcv: "回復" };
-  const label = names[state.statType] || "攻撃";
-  const line = $("#supportAtkLine");
-  if (line) line.childNodes[0].textContent = `応援デッキ${label} + `;
   ["#editAtkLabel", "#editHpLabel", "#editRcvLabel"].forEach((id) => $(id)?.classList.remove("statActiveLabel"));
   const map = { atk: "#editAtkLabel", hp: "#editHpLabel", rcv: "#editRcvLabel" };
   $(map[state.statType])?.classList.add("statActiveLabel");
+  document.querySelectorAll("#ccHp, #ccAtk, #ccRcv, .cc-hp, .cc-atk, .cc-rcv")
+    .forEach((el) => el.classList.remove("statActive"));
+  const ccMap = { atk: "#ccAtk", hp: "#ccHp", rcv: "#ccRcv" };
+  $(ccMap[state.statType] || "#ccAtk")?.classList.add("statActive");
+  document.querySelectorAll(`.cc-${state.statType || "atk"}`).forEach((el) => el.classList.add("statActive"));
+}
+
+// タワーボーナス・応援デッキの色ごとの設定テーブルを描画する
+function renderColorConfig() {
+  const tbody = $("#colorConfigTable tbody");
+  tbody.innerHTML = "";
+  COLORS.forEach((color) => {
+    const cc = state.colorConfig[color];
+    const tr = document.createElement("tr");
+
+    const tdColor = document.createElement("td");
+    tdColor.innerHTML = colorBadge(color);
+    tr.appendChild(tdColor);
+
+    const tdTower = document.createElement("td");
+    const towerInput = document.createElement("input");
+    towerInput.type = "number";
+    towerInput.step = "0.001";
+    towerInput.value = cc.tower;
+    towerInput.addEventListener("input", () => {
+      cc.tower = Number(towerInput.value) || 0;
+      renderHeader();
+      saveState();
+    });
+    tdTower.appendChild(towerInput);
+    tr.appendChild(tdTower);
+
+    for (const key of ["hp", "atk", "rcv"]) {
+      const td = document.createElement("td");
+      td.className = `cc-${key}`;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.step = "10";
+      input.value = cc[key];
+      input.addEventListener("input", () => {
+        cc[key] = Number(input.value) || 0;
+        renderHeader();
+        saveState();
+      });
+      td.appendChild(input);
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  });
+  updateStatLabels();
 }
 
 // 設定タブ
@@ -781,11 +866,7 @@ function renderSettings() {
   Object.keys(SHIELDS).forEach((s) => es.appendChild(new Option(s, s, false, s === state.enemyShield)));
   es.onchange = () => { state.enemyShield = es.value; renderHeader(); saveState(); };
 
-  for (const [id, key] of [["#supportAtk", "supportAtk"]]) {
-    const el = $(id);
-    el.value = state[key];
-    el.oninput = () => { state[key] = Number(el.value) || 0; renderHeader(); saveState(); };
-  }
+  renderColorConfig();
 }
 $("#resetBtn").addEventListener("click", () => {
   if (!confirm("入力内容をすべて消して初期状態に戻します。よろしいですか？")) return;
