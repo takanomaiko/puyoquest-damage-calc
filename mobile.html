@@ -135,6 +135,7 @@
   /* カード編集モーダル */
   .eline { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
   .eline label { width: 4.5em; flex: none; color: var(--sub); }
+  .eline label.statActiveLabel { color: var(--accent); font-weight: 700; }
   .eline input[type="text"], .eline input[type="number"], .eline select {
     flex: 1; font-size: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; min-width: 0;
   }
@@ -167,13 +168,17 @@
 
   <div id="tab-set" class="tab">
     <div class="setcard">
+      <h3>計算に使うステータス</h3>
+      <div class="colorbtns" id="statTypeBtns"></div>
+    </div>
+    <div class="setcard">
       <h3>敵の属性</h3>
       <div class="colorbtns" id="enemyColors"></div>
     </div>
     <div class="setcard">
       <h3>敵の盾・共通設定</h3>
       <div class="setline">盾 <select id="enemyShield"></select></div>
-      <div class="setline">応援デッキ攻撃 + <input type="number" id="supportAtk" step="10"></div>
+      <div class="setline" id="supportAtkLine">応援デッキ攻撃 + <input type="number" id="supportAtk" step="10"></div>
       <div class="setline">主属性係数 <input type="number" id="coefMain"> 副属性係数 <input type="number" id="coefSub"></div>
     </div>
     <div class="setcard">
@@ -224,7 +229,9 @@
       <button class="act" id="editSearch">🔍 カードDBから選ぶ</button>
     </div>
     <div class="eline"><label>名前</label><input type="text" id="editName"></div>
-    <div class="eline"><label>攻撃力</label><input type="number" id="editAtk"></div>
+    <div class="eline"><label id="editAtkLabel">攻撃</label><input type="number" id="editAtk"></div>
+    <div class="eline"><label id="editHpLabel">体力</label><input type="number" id="editHp"></div>
+    <div class="eline"><label id="editRcvLabel">回復</label><input type="number" id="editRcv"></div>
     <div class="eline"><label>主属性</label><select id="editMain"></select></div>
     <div class="eline"><label>副属性</label><select id="editSub"></select></div>
     <div class="eline"><label>コンビ✨</label><input type="checkbox" id="editCombo" style="width:22px;height:22px;flex:none;accent-color:var(--accent)"></div>
@@ -263,8 +270,8 @@ function sampleState() {
   const emptyCells = () => Array.from({ length: 6 }, () => ({ m: "", s: "" }));
   return {
     deckName: "",
-    cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, main: "赤", sub: "なし", img: "", combo: false })),
-    enemyColor: "緑", enemyShield: "盾なし",
+    cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, hp: 0, rcv: 0, main: "赤", sub: "なし", img: "", combo: false })),
+    enemyColor: "緑", enemyShield: "盾なし", statType: "atk",
     supportAtk: 500, coefMain: 3, coefSub: 1,
     rows: [
       { name: "リーダースキル", on: true, cells: emptyCells() },
@@ -303,7 +310,7 @@ function cellValue(str) {
 function calc() {
   const results = state.cards.map((card, i) => {
     const hasSub = card.sub && card.sub !== "なし";
-    const base = (Number(card.atk) || 0) + (Number(state.supportAtk) || 0);
+    const base = (Number(card[state.statType || "atk"]) || 0) + (Number(state.supportAtk) || 0);
     let m = base * (Number(state.coefMain) || 0);
     let s = hasSub ? base * (Number(state.coefSub) || 0) : 0;
     for (const row of state.rows) {
@@ -710,8 +717,37 @@ $("#addRowBtn").addEventListener("click", () => {
   saveState();
 });
 
+// 選択中のステータスに合わせてラベル類を更新
+function updateStatLabels() {
+  const names = { atk: "攻撃", hp: "体力", rcv: "回復" };
+  const label = names[state.statType] || "攻撃";
+  const line = $("#supportAtkLine");
+  if (line) line.childNodes[0].textContent = `応援デッキ${label} + `;
+  ["#editAtkLabel", "#editHpLabel", "#editRcvLabel"].forEach((id) => $(id)?.classList.remove("statActiveLabel"));
+  const map = { atk: "#editAtkLabel", hp: "#editHpLabel", rcv: "#editRcvLabel" };
+  $(map[state.statType])?.classList.add("statActiveLabel");
+}
+
 // 設定タブ
 function renderSettings() {
+  const stBox = $("#statTypeBtns");
+  stBox.innerHTML = "";
+  const statNames = { atk: "攻撃", hp: "体力", rcv: "回復" };
+  Object.keys(statNames).forEach((key) => {
+    const b = document.createElement("button");
+    b.textContent = statNames[key];
+    b.style.background = "var(--accent)";
+    b.className = state.statType === key ? "sel" : "";
+    b.addEventListener("click", () => {
+      state.statType = key;
+      updateStatLabels();
+      renderAll();
+      saveState();
+    });
+    stBox.appendChild(b);
+  });
+  updateStatLabels();
+
   const box = $("#enemyColors");
   box.innerHTML = "";
   const bg = { 赤: "var(--red)", 青: "var(--blue)", 緑: "var(--green)", 黄: "var(--yellow)", 紫: "var(--purple)" };
@@ -816,7 +852,13 @@ function openCardModal(i) {
     `<div><div style="font-weight:700; font-size:15px">${card.name || "（無名）"}</div>` +
     `<div style="margin-top:4px">${colorBadge(card.main)}${hasSub ? colorBadge(card.sub) : ""}` +
     `${role ? ` <span class="badge" style="background:var(--accent)">${role}</span>` : ""}</div></div>`;
+  const statLine = [
+    card.atk ? `攻撃 ${fmt(card.atk)}` : "",
+    card.hp ? `体力 ${fmt(card.hp)}` : "",
+    card.rcv ? `回復 ${fmt(card.rcv)}` : "",
+  ].filter(Boolean).join("　／　");
   const secs = [];
+  if (statLine) secs.push(["ステータス", statLine, "sub"]);
   if ((i === 0 || i === 5) && card.ls) secs.push(["リーダースキル", card.ls, ""]);
   if (card.ns) secs.push(["スキル", card.ns, ""]);
   if (card.fp) secs.push(["フルパワー", card.fp, "sub"]);
@@ -862,6 +904,8 @@ function openEdit(i) {
   $("#editTitle").textContent = `${i + 1}枚目のカード ${role}`;
   $("#editName").value = card.name;
   $("#editAtk").value = card.atk || "";
+  $("#editHp").value = card.hp || "";
+  $("#editRcv").value = card.rcv || "";
   const mainSel = $("#editMain"), subSel = $("#editSub");
   mainSel.innerHTML = ""; subSel.innerHTML = "";
   COLORS.forEach((c) => mainSel.appendChild(new Option(c, c, false, c === card.main)));
@@ -871,6 +915,8 @@ function openEdit(i) {
 }
 $("#editName").addEventListener("input", () => { state.cards[editTarget].name = $("#editName").value; renderHeader(); saveState(); });
 $("#editAtk").addEventListener("input", () => { state.cards[editTarget].atk = Number($("#editAtk").value) || 0; renderHeader(); saveState(); });
+$("#editHp").addEventListener("input", () => { state.cards[editTarget].hp = Number($("#editHp").value) || 0; renderHeader(); saveState(); });
+$("#editRcv").addEventListener("input", () => { state.cards[editTarget].rcv = Number($("#editRcv").value) || 0; renderHeader(); saveState(); });
 $("#editMain").addEventListener("change", () => { state.cards[editTarget].main = $("#editMain").value; refreshAutoRows(); renderHeader(); saveState(); });
 $("#editSub").addEventListener("change", () => { state.cards[editTarget].sub = $("#editSub").value; refreshAutoRows(); renderHeader(); saveState(); });
 $("#editCombo").addEventListener("change", () => { state.cards[editTarget].combo = $("#editCombo").checked; refreshAutoRows(); renderHeader(); saveState(); });
@@ -909,7 +955,8 @@ $("#searchInput").addEventListener("input", () => {
     div.innerHTML =
       `<img src="${c.u}" alt="" loading="lazy">` +
       `<div style="text-align:left"><div>★${c.r} ${c.n}</div>` +
-      `<div>${main ? colorBadge(main) : ""}${sub ? colorBadge(sub) : ""} <span style="font-size:11px; color:var(--sub)">${c.t || ""}${c.a ? `　攻撃${c.a}${c.x ? "（とっくんなし）" : ""}` : ""}${c.w ? "　[Wiki]" : ""}</span></div></div>`;
+      `<div>${main ? colorBadge(main) : ""}${sub ? colorBadge(sub) : ""} <span style="font-size:11px; color:var(--sub)">${c.t || ""}` +
+      `${c.a ? `　攻${c.a}` : ""}${c.h ? `　体${c.h}` : ""}${c.c ? `　回${c.c}` : ""}${c.x ? "（とっくんなし）" : ""}${c.w ? "　[Wiki]" : ""}</span></div></div>`;
     div.addEventListener("click", () => pickCard(c));
     box.appendChild(div);
   });
@@ -921,6 +968,8 @@ function pickCard(c) {
   card.sub = COLOR_NUM[c.s] || "なし";
   card.img = c.u;
   if (c.a) card.atk = c.a;
+  if (c.h) card.hp = c.h;
+  if (c.c) card.rcv = c.c;
   card.ns = c.ns || ""; card.ls = c.ls || "";
   card.fp = c.fp || ""; card.ts = c.ts || "";
   card.ab = c.ab || ""; card.ga = c.ga || "";

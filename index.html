@@ -59,6 +59,8 @@
   #resultTotals { font-size: 14px; margin-top: 10px; line-height: 1.9; }
   #resultTotals .big { font-size: 26px; font-weight: 700; color: var(--accent); }
   .deck-row td:first-child input { width: 13em; }
+  th.statActive, td.statActive { background: #e3ecff; }
+  .deck-row td.statActive input { background: #eef3ff; font-weight: 700; }
   .settings { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 13px; }
   .settings label { display: flex; align-items: center; gap: 5px; }
   footer { text-align: center; padding: 10px 0 30px; }
@@ -181,11 +183,11 @@
 
   <section>
     <h2>デッキ（カード設定）</h2>
-    <p class="hint">カード名・攻撃力・属性を入力します。副属性がないカードは「なし」を選んでください。</p>
+    <p class="hint">カード名・ステータス・属性を入力します。副属性がないカードは「なし」を選んでください。計算に使うステータスは下の「敵・共通設定」で選べます（水色の列が使用中）。</p>
     <div class="scroll">
       <table id="deckTable">
         <thead>
-          <tr><th>カード名</th><th>攻撃力</th><th>主属性</th><th>副属性</th><th>コンビ✨</th></tr>
+          <tr><th>カード名</th><th id="thAtk">攻撃</th><th id="thHp">体力</th><th id="thRcv">回復</th><th>主属性</th><th>副属性</th><th>コンビ✨</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -195,13 +197,20 @@
   <section>
     <h2>敵・共通設定</h2>
     <div class="settings">
+      <label>計算に使うステータス
+        <select id="statType">
+          <option value="atk">攻撃</option>
+          <option value="hp">体力</option>
+          <option value="rcv">回復</option>
+        </select>
+      </label>
       <label>敵の属性
         <select id="enemyColor"></select>
       </label>
       <label>敵の盾
         <select id="enemyShield"></select>
       </label>
-      <label>応援デッキ攻撃 +
+      <label id="supportAtkLabel">応援デッキ攻撃 +
         <input type="number" id="supportAtk" step="10">
       </label>
       <label>主属性係数
@@ -211,7 +220,7 @@
         <input type="number" id="coefSub" step="1">
       </label>
     </div>
-    <p class="hint">計算式：（攻撃力＋応援）× 係数 × 各倍率 × 属性相性 × 盾。副属性は主属性の1/3（係数3対1）で計算されます。</p>
+    <p class="hint" id="calcHint">計算式：（攻撃力＋応援）× 係数 × 各倍率 × 属性相性 × 盾。副属性は主属性の1/3（係数3対1）で計算されます。</p>
   </section>
 
   <section>
@@ -311,9 +320,10 @@ function sampleState() {
   const emptyCells = () => Array.from({ length: 6 }, () => ({ m: "", s: "" }));
   return {
     deckName: "",
-    cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, main: "赤", sub: "なし", img: "", combo: false })),
+    cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, hp: 0, rcv: 0, main: "赤", sub: "なし", img: "", combo: false })),
     enemyColor: "緑",
     enemyShield: "盾なし",
+    statType: "atk",
     supportAtk: 500,
     coefMain: 3,
     coefSub: 1,
@@ -362,7 +372,7 @@ function cellValue(str) {
 function calc() {
   const results = state.cards.map((card, i) => {
     const hasSub = card.sub && card.sub !== "なし";
-    const base = (Number(card.atk) || 0) + (Number(state.supportAtk) || 0);
+    const base = (Number(card[state.statType || "atk"]) || 0) + (Number(state.supportAtk) || 0);
     let m = base * (Number(state.coefMain) || 0);
     let s = hasSub ? base * (Number(state.coefSub) || 0) : 0;
     for (const row of state.rows) {
@@ -465,7 +475,8 @@ $("#searchInput").addEventListener("input", () => {
     div.innerHTML =
       `<img src="${c.u}" alt="" loading="lazy">` +
       `<div style="text-align:left"><div>★${c.r} ${c.n}</div>` +
-      `<div>${main ? colorBadge(main) : ""}${sub ? colorBadge(sub) : ""} <span class="hint">${c.t || ""}${c.a ? `　攻撃${c.a}${c.x ? "（とっくんなし）" : ""}` : ""}${c.w ? "　[Wiki]" : ""}</span></div></div>`;
+      `<div>${main ? colorBadge(main) : ""}${sub ? colorBadge(sub) : ""} <span class="hint">${c.t || ""}` +
+      `${c.a ? `　攻${c.a}` : ""}${c.h ? `　体${c.h}` : ""}${c.c ? `　回${c.c}` : ""}${c.x ? "（とっくんなし）" : ""}${c.w ? "　[Wiki]" : ""}</span></div></div>`;
     div.addEventListener("click", () => pickCard(c));
     box.appendChild(div);
   });
@@ -478,6 +489,8 @@ function pickCard(c) {
   card.sub = COLOR_NUM[c.s] || "なし";
   card.img = c.u;   // DBの画像URLをそのままイラストに使う
   if (c.a) card.atk = c.a;   // ステDBの攻撃力（とっくん最大値）
+  if (c.h) card.hp = c.h;    // ステDBの体力
+  if (c.c) card.rcv = c.c;   // ステDBの回復力
   card.ns = c.ns || "";
   card.ls = c.ls || "";
   card.fp = c.fp || "";     // フルパワースキル
@@ -612,7 +625,14 @@ function openCardModal(i) {
     `<div style="margin-top:4px">${colorBadge(card.main)}${hasSub ? colorBadge(card.sub) : ""}` +
     `${role ? ` <span class="badge" style="background:var(--accent)">${role}</span>` : ""}</div></div>`;
 
+  const statLine = [
+    card.atk ? `攻撃 ${fmt(card.atk)}` : "",
+    card.hp ? `体力 ${fmt(card.hp)}` : "",
+    card.rcv ? `回復 ${fmt(card.rcv)}` : "",
+  ].filter(Boolean).join("　／　");
+
   const secs = [];
+  if (statLine) secs.push(["ステータス", statLine, "sub"]);
   if ((i === 0 || i === 5) && card.ls) secs.push(["リーダースキル", card.ls, ""]);
   if (card.ns) secs.push(["スキル", card.ns, ""]);
   if (card.fp) secs.push(["フルパワー", card.fp, "sub"]);
@@ -881,6 +901,7 @@ function renderDeck() {
     }
 
     const tdAtk = document.createElement("td");
+    tdAtk.className = "statcell-atk";
     const atkInput = document.createElement("input");
     atkInput.type = "number";
     atkInput.value = card.atk;
@@ -890,6 +911,30 @@ function renderDeck() {
       saveState();
     });
     tdAtk.appendChild(atkInput);
+
+    const tdHp = document.createElement("td");
+    tdHp.className = "statcell-hp";
+    const hpInput = document.createElement("input");
+    hpInput.type = "number";
+    hpInput.value = card.hp || 0;
+    hpInput.addEventListener("input", () => {
+      card.hp = Number(hpInput.value) || 0;
+      renderResults();
+      saveState();
+    });
+    tdHp.appendChild(hpInput);
+
+    const tdRcv = document.createElement("td");
+    tdRcv.className = "statcell-rcv";
+    const rcvInput = document.createElement("input");
+    rcvInput.type = "number";
+    rcvInput.value = card.rcv || 0;
+    rcvInput.addEventListener("input", () => {
+      card.rcv = Number(rcvInput.value) || 0;
+      renderResults();
+      saveState();
+    });
+    tdRcv.appendChild(rcvInput);
 
     const tdMain = document.createElement("td");
     const mainSel = makeSelect(COLORS, card.main);
@@ -922,9 +967,21 @@ function renderDeck() {
     comboChk.addEventListener("change", () => toggleCombo(i));
     tdCombo.appendChild(comboChk);
 
-    tr.append(tdName, tdAtk, tdMain, tdSub, tdCombo);
+    tr.append(tdName, tdAtk, tdHp, tdRcv, tdMain, tdSub, tdCombo);
     tbody.appendChild(tr);
   });
+  highlightStatColumn();
+}
+
+// 計算に使われているステータスの列を水色で強調する
+function highlightStatColumn() {
+  const map = { atk: "atk", hp: "hp", rcv: "rcv" };
+  const active = map[state.statType] || "atk";
+  document.querySelectorAll("#thAtk, #thHp, #thRcv, .statcell-atk, .statcell-hp, .statcell-rcv")
+    .forEach((el) => el.classList.remove("statActive"));
+  const idMap = { atk: "#thAtk", hp: "#thHp", rcv: "#thRcv" };
+  $(idMap[active])?.classList.add("statActive");
+  document.querySelectorAll(`.statcell-${active}`).forEach((el) => el.classList.add("statActive"));
 }
 
 // ヘッダー（合計ダメージの上）にデッキ名を表示
@@ -933,11 +990,32 @@ function updateDeckTitle() {
   if (el) el.textContent = state.deckName || "";
 }
 
+// 選択中のステータスに合わせてラベルと計算式ヒントを更新する
+function updateStatLabels() {
+  const names = { atk: "攻撃", hp: "体力", rcv: "回復" };
+  const label = names[state.statType] || "攻撃";
+  const labelEl = $("#supportAtkLabel");
+  if (labelEl) labelEl.childNodes[0].textContent = `応援デッキ${label} +`;
+  const hint = $("#calcHint");
+  if (hint) hint.textContent = `計算式：（${label}＋応援）× 係数 × 各倍率 × 属性相性 × 盾。副属性は主属性の1/3（係数3対1）で計算されます。`;
+}
+
 function renderCommon() {
   const dn = $("#deckName");
   dn.value = state.deckName || "";
   updateDeckTitle();
   dn.oninput = () => { state.deckName = dn.value; updateDeckTitle(); saveState(); };
+
+  const st = $("#statType");
+  st.value = state.statType || "atk";
+  st.onchange = () => {
+    state.statType = st.value;
+    updateStatLabels();
+    renderDeck();
+    renderResults();
+    saveState();
+  };
+  updateStatLabels();
 
   const ec = $("#enemyColor");
   ec.innerHTML = "";
