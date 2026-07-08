@@ -218,7 +218,7 @@
         <span style="font-weight:600">主属性 ×1／副属性 ×1/3</span>
       </label>
     </div>
-    <p class="hint" id="calcHint">計算式：（ステータス×タワーボーナス＋応援デッキ）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。</p>
+    <p class="hint" id="calcHint">計算式：（ステータス＋応援デッキ）×タワーボーナス× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。</p>
   </section>
 
   <section>
@@ -407,7 +407,7 @@ function calc() {
     const cc = (state.colorConfig && state.colorConfig[card.main]) || {};
     const towerMult = Number(cc.tower) || 1;
     const supportBonus = Number(cc[state.statType || "atk"]) || 0;
-    const base = (Number(card[state.statType || "atk"]) || 0) * towerMult + supportBonus;
+    const base = ((Number(card[state.statType || "atk"]) || 0) + supportBonus) * towerMult;
     let m = base * COEF_MAIN;
     let s = hasSub ? base * COEF_SUB : 0;
     for (const row of state.rows) {
@@ -1030,7 +1030,7 @@ function updateStatLabels() {
   const names = { atk: "攻撃", hp: "体力", rcv: "回復" };
   const label = names[state.statType] || "攻撃";
   const hint = $("#calcHint");
-  if (hint) hint.textContent = `計算式：（${label}×タワーボーナス＋応援デッキ）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。`;
+  if (hint) hint.textContent = `計算式：（${label}＋応援デッキ）×タワーボーナス× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。`;
   document.querySelectorAll("#ccHp, #ccAtk, #ccRcv, .cc-hp, .cc-atk, .cc-rcv")
     .forEach((el) => el.classList.remove("statActive"));
   const idMap = { atk: "#ccAtk", hp: "#ccHp", rcv: "#ccRcv" };

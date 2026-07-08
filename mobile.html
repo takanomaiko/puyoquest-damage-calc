@@ -359,7 +359,7 @@ function calc() {
     const cc = (state.colorConfig && state.colorConfig[card.main]) || {};
     const towerMult = Number(cc.tower) || 1;
     const supportBonus = Number(cc[state.statType || "atk"]) || 0;
-    const base = (Number(card[state.statType || "atk"]) || 0) * towerMult + supportBonus;
+    const base = ((Number(card[state.statType || "atk"]) || 0) + supportBonus) * towerMult;
     let m = base * COEF_MAIN;
     let s = hasSub ? base * COEF_SUB : 0;
     for (const row of state.rows) {
