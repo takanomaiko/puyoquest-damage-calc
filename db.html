@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カード図鑑 - ぷよクエ ダメージ計算機</title>
+<style>
+  :root {
+    --red: #e74c3c; --blue: #3498db; --green: #27ae60; --yellow: #f1c40f; --purple: #9b59b6;
+    --bg: #f4f6fa; --border: #dde3ec; --text: #2c3e50; --sub: #7f8c9b; --accent: #5b6ee1;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Hiragino Sans", "Yu Gothic", sans-serif; background: var(--bg); color: var(--text); }
+  header { position: sticky; top: 0; z-index: 10; background: var(--accent); color: #fff; padding: 10px 12px; }
+  header h1 { font-size: 15px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 a { color: #fff; font-size: 12px; font-weight: normal; }
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; }
+  .controls input, .controls select {
+    font-size: 14px; padding: 7px; border: none; border-radius: 8px;
+  }
+  .controls input { flex: 1; min-width: 10em; }
+  main { max-width: 720px; margin: 0 auto; padding: 10px; }
+  #count { font-size: 12px; color: var(--sub); margin: 4px 2px 8px; }
+  .item { background: #fff; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; overflow: hidden; }
+  .ihead { display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; }
+  .ihead img { width: 44px; height: 44px; object-fit: contain; flex: none; border-radius: 6px; }
+  .iinfo { flex: 1; min-width: 0; }
+  .iname { font-size: 13px; font-weight: 700; }
+  .imeta { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .iatk { flex: none; text-align: right; font-size: 13px; font-weight: 700; color: var(--accent); }
+  .iatk small { display: block; font-weight: normal; color: var(--sub); font-size: 10px; }
+  .badge { display: inline-block; padding: 0 5px; border-radius: 4px; color: #fff; font-size: 10px; }
+  .c赤 { background: var(--red); } .c青 { background: var(--blue); } .c緑 { background: var(--green); }
+  .c黄 { background: var(--yellow); color: #333; } .c紫 { background: var(--purple); }
+  .ibody { display: none; border-top: 1px solid var(--border); padding: 10px 12px; background: #fafbfe; font-size: 12px; line-height: 1.7; }
+  .item.open .ibody { display: block; }
+  .lbl { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); padding: 1px 8px; border-radius: 8px; margin: 8px 0 2px; }
+  .lbl.sub { background: #8a93a8; }
+  .skrow { font-size: 12px; margin: 2px 0; }
+  #moreBtn { display: block; width: 100%; padding: 12px; margin: 8px 0 20px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
+  .dl { text-align: center; font-size: 12px; margin: 12px 0 30px; color: var(--sub); }
+  .dl a { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>カード図鑑（<span id="total">-</span>枚収録） <a href="mobile.html">← 計算機に戻る</a></h1>
+  <div class="controls">
+    <input type="text" id="q" placeholder="カード名で検索">
+    <select id="fColor">
+      <option value="">全属性</option>
+      <option>赤</option><option>青</option><option>緑</option><option>黄</option><option>紫</option>
+    </select>
+    <select id="fRarity">
+      <option value="">全レア</option>
+      <option value="7">★7</option><option value="6">★6</option><option value="5">★5</option>
+    </select>
+    <select id="fSrc">
+      <option value="">全出典</option>
+      <option value="sheet">シート</option>
+      <option value="wiki">Wiki</option>
+    </select>
+  </div>
+</header>
+
+<main>
+  <div id="count"></div>
+  <div id="list"></div>
+  <button id="moreBtn" style="display:none">さらに表示</button>
+  <p class="dl">表計算ソフト用: <a href="carddb.csv" download>carddb.csv をダウンロード</a><br>
+  （Googleスプレッドシートの「ファイル→インポート」で開けます）</p>
+</main>
+
+<script src="carddb.js"></script>
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const COLOR_NUM = { 1: "赤", 2: "青", 3: "緑", 4: "黄", 5: "紫" };
+const badge = (c) => c ? `<span class="badge c${c}">${c}</span>` : "";
+
+$("#total").textContent = CARD_DB.length.toLocaleString("ja-JP");
+
+let shown = 0;
+let current = [];
+const PAGE = 60;
+
+function filterCards() {
+  const q = $("#q").value.trim();
+  const fc = $("#fColor").value;
+  const fr = $("#fRarity").value;
+  const fs = $("#fSrc").value;
+  return CARD_DB.filter((c) => {
+    if (q && !c.n.includes(q)) return false;
+    if (fc && COLOR_NUM[c.m] !== fc && COLOR_NUM[c.s] !== fc) return false;
+    if (fr && c.r !== fr) return false;
+    if (fs === "wiki" && !c.w) return false;
+    if (fs === "sheet" && c.w) return false;
+    return true;
+  });
+}
+
+function detailHTML(c) {
+  const secs = [];
+  if (c.sk && c.sk.length) {
+    secs.push(`<div class="lbl">倍率スキル（自動入力される行）</div>` +
+      c.sk.map((s) => `<div class="skrow">・${s.k} <strong>×${s.v || "?"}</strong>（${s.r || "味方全体"}）${s.o === "LS" ? "※リーダー/サポート時のみ" : ""}</div>`).join(""));
+  }
+  if (c.ail && c.ail.length) {
+    secs.push(`<div class="lbl">付与できる状態異常</div><div class="skrow">` +
+      c.ail.map((a) => `${a.k}（被ダメ×${a.v}）${a.o === "LS" ? "※リーダー時" : ""}`).join("、") + `</div>`);
+  }
+  if (c.lm) secs.push(`<div class="lbl">リーダースキル倍率</div><div class="skrow">攻撃×${c.lm[1]}（${c.lr || "味方全体"}）</div>`);
+  if (c.ls) secs.push(`<div class="lbl sub">リーダースキル</div><div>${c.ls}</div>`);
+  if (c.ns) secs.push(`<div class="lbl sub">スキル</div><div>${c.ns}</div>`);
+  if (c.fp) secs.push(`<div class="lbl sub">フルパワー</div><div>${c.fp}</div>`);
+  if (c.ts) secs.push(`<div class="lbl sub">とくもり</div><div>${c.ts}</div>`);
+  if (c.ab) secs.push(`<div class="lbl sub">アビリティ</div><div>${c.ab}</div>`);
+  if (c.ga) secs.push(`<div class="lbl sub">きらめきオーラ</div><div>${c.ga}</div>`);
+  return secs.join("") || "詳細データなし";
+}
+
+function renderMore() {
+  const list = $("#list");
+  const slice = current.slice(shown, shown + PAGE);
+  slice.forEach((c) => {
+    const item = document.createElement("div");
+    item.className = "item";
+    const atk = c.a ? `${c.a.toLocaleString("ja-JP")}<small>${c.x ? "とっくんなし" : "とっくん込み"}</small>` : "";
+    item.innerHTML =
+      `<div class="ihead">` +
+      (c.u ? `<img src="${c.u}" loading="lazy" alt="">` : "") +
+      `<div class="iinfo"><div class="iname">★${c.r} ${c.n}</div>` +
+      `<div class="imeta">${badge(COLOR_NUM[c.m])}${badge(COLOR_NUM[c.s])} ${c.t || ""}${c.w ? "　[Wiki]" : ""}</div></div>` +
+      `<div class="iatk">${atk}</div></div>` +
+      `<div class="ibody"></div>`;
+    item.querySelector(".ihead").addEventListener("click", () => {
+      if (!item.classList.contains("open")) item.querySelector(".ibody").innerHTML = detailHTML(c);
+      item.classList.toggle("open");
+    });
+    list.appendChild(item);
+  });
+  shown += slice.length;
+  $("#moreBtn").style.display = shown < current.length ? "block" : "none";
+  $("#count").textContent = `${current.length.toLocaleString("ja-JP")}件ヒット（${shown}件表示中）`;
+}
+
+function refresh() {
+  current = filterCards();
+  shown = 0;
+  $("#list").innerHTML = "";
+  renderMore();
+}
+
+["#q", "#fColor", "#fRarity", "#fSrc"].forEach((id) => {
+  $(id).addEventListener("input", refresh);
+});
+$("#moreBtn").addEventListener("click", renderMore);
+refresh();
+</script>
+</body>
+</html>

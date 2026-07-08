@@ -244,6 +244,27 @@ def main():
     print(f"完成! カード数: {len(cards)}（とっくん込み攻撃力: {matched}、Lv.MAX素値: {matched_lv}）")
     print(f"サイズ: {os.path.getsize(out) / 1024 / 1024:.2f} MB → {out}")
 
+    # 人間が読める形（CSV）でも出力する。Googleスプレッドシートにインポート可能
+    csv_out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "carddb.csv")
+    with open(csv_out, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["名称", "レア度", "タイプ", "主属性", "副属性", "攻撃", "体力", "回復",
+                    "とっくん", "出典", "リダ攻倍率", "倍率スキル", "付与できる状態異常",
+                    "スキル", "リーダースキル", "とくもり", "きらめきオーラ"])
+        for e in cards:
+            w.writerow([
+                e["n"], "★" + e["r"], e.get("t", ""),
+                COLOR.get(e.get("m"), ""), COLOR.get(e.get("s"), ""),
+                e.get("a", ""), e.get("h", ""), e.get("c", ""),
+                ("込み" if e.get("a") and not e.get("x") else ("なし" if e.get("a") else "")),
+                ("Wiki" if e.get("w") else "シート"),
+                (e.get("lm") or [0, "", 0])[1] if e.get("lm") else "",
+                "; ".join(f"{s['k']}×{s['v']}{'(LS時のみ)' if s.get('o') == 'LS' else ''}" for s in e.get("sk", [])),
+                "; ".join(f"{a['k']}×{a['v']}" for a in e.get("ail", [])),
+                e.get("ns", ""), e.get("ls", ""), e.get("ts", ""), e.get("ga", ""),
+            ])
+    print(f"CSV版も出力: {csv_out}")
+
 
 if __name__ == "__main__":
     main()
