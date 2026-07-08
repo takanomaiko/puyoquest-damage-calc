@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ぷよクエ ダメージ計算機</title>
+<script>
+  // スマホからのアクセスはスマホ最適化版へ自動で移動（URLに ?pc を付けるとこの画面のまま）
+  if (!location.search.includes("pc") && matchMedia("(max-width: 700px) and (pointer: coarse)").matches) {
+    location.replace("mobile.html");
+  }
+</script>
 <style>
   :root {
     --red: #e74c3c; --blue: #3498db; --green: #27ae60; --yellow: #f1c40f; --purple: #9b59b6;
@@ -486,11 +492,13 @@ function pickCard(c) {
 }
 
 // スキルの範囲（味方全体/同色/色指定）が対象カードに当てはまるか
+// 色指定は副属性も対象（例:「青属性に5倍」は副属性が青のカードにも乗る）
 function skillRangeMatches(range, srcColor, target) {
   if (!range || range.includes("全体")) return true;
-  if (range.includes("同色")) return target.main === srcColor;
+  const sub = target.sub && target.sub !== "なし" ? target.sub : null;
+  if (range.includes("同色")) return target.main === srcColor || sub === srcColor;
   const colors = COLORS.filter((col) => range.includes(col));
-  if (colors.length) return colors.includes(target.main);
+  if (colors.length) return colors.includes(target.main) || (sub && colors.includes(sub));
   return true;
 }
 
@@ -514,6 +522,8 @@ function applySkillRows(slot, c) {
   // 行の名前はスキル名だけにして、カードはアイコンで見分ける
   state.rows = state.rows.filter((r) => r.auto !== slot);
   for (const s of c.sk || []) {
+    // リーダースキル由来の倍率は、リーダー/サポートに置いたときだけ行追加する
+    if (s.o === "LS" && slot !== 0 && slot !== 5) continue;
     state.rows.push({
       name: s.k,
       on: true,
@@ -557,6 +567,28 @@ function openDmgModal(i) {
     `<p style="margin:10px 0 0; font-size:12px; color:var(--sub)">属性相性: 主×${r.affM}${r.hasSub ? ` ／ 副×${r.affS}` : ""}（敵は${state.enemyColor}属性）</p>`;
   $("#skillModal").classList.add("open");
 }
+
+// 合計ダメージの詳細ウィンドウ（ヘッダーの合計をタップで開く）
+function openTotalModal() {
+  const { results, totalMain, total } = calc();
+  $("#skillModalTitle").textContent = "合計ダメージの詳細";
+  $("#skillModalBody").innerHTML =
+    `<table style="width:100%; border-collapse:collapse; margin-top:4px">` +
+    state.cards.map((card, i) => {
+      const r = results[i];
+      return `<tr><td style="text-align:left; padding:3px 0">${colorBadge(card.main)} ${(card.name || "（無名）")}</td>` +
+        `<td style="text-align:right; padding-left:6px">${fmt(r.m + r.s)}</td>` +
+        `<td style="text-align:right; padding-left:6px; color:var(--accent); font-weight:700">${fmtUnit(r.m + r.s)}</td></tr>`;
+    }).join("") +
+    `</table>` +
+    `<hr style="border:none; border-top:1px solid var(--border); margin:10px 0">` +
+    `<div style="font-size:13px; line-height:2">主属性のみ合計：<strong>${fmtUnit(totalMain)}</strong>（${fmt(totalMain)}）<br>` +
+    `総合計：<strong style="color:var(--accent); font-size:17px">${fmtUnit(total)}</strong>（${fmt(total)}）</div>`;
+  $("#skillModal").classList.add("open");
+}
+$("#totalBar").style.cursor = "pointer";
+$("#totalBar").title = "タップで合計の詳細を見る";
+$("#totalBar").addEventListener("click", openTotalModal);
 
 // カード詳細ウィンドウ（リーダー/サポートはリーダースキルも表示）
 function openCardModal(i) {
@@ -650,8 +682,11 @@ function toggleCombo(i) {
 // 複数の状態異常は倍率の高いものだけが適用されるゲーム仕様なので、最大値を入れる
 function refreshAilmentRow() {
   const all = [];
-  state.cards.forEach((cd) => {
-    (cd.ail || []).forEach((a) => all.push({ ...a, card: cd.name, img: cd.img }));
+  state.cards.forEach((cd, idx) => {
+    (cd.ail || []).forEach((a) => {
+      if (a.o === "LS" && idx !== 0 && idx !== 5) return; // LS由来はリーダー/サポート時のみ
+      all.push({ ...a, card: cd.name, img: cd.img });
+    });
   });
   let row = state.rows.find((r) => r.st);
   if (all.length === 0) {
@@ -1105,6 +1140,7 @@ function renderAll() {
   renderResults();
 }
 
+refreshAutoRows(); // 保存データの自動行を最新の判定ルールで再計算
 renderAll();
 </script>
 </body>

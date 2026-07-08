@@ -114,12 +114,19 @@ def main():
         elif dai == "その他" and syo in ("プリズム効果アップ", "クリティカル倍率up"):
             name_map = syo
         # 状態異常（怒り/怯え/脱力/麻痺）: 敵に付与するとダメージ増
-        # リダスキの「開幕怯え」も怯えとして扱う
+        # リダスキの「開幕怯え」も怯えとして扱う（LS由来はリーダー配置時のみ有効の印を付ける）
         ail_key = syo if dai == "状態異常" else ("怯え" if syo == "開幕怯え" else None)
         if ail_key in AILMENT_MAP:
             ail = e.setdefault("ail", [])
-            if not any(a["k"] == ail_key for a in ail):
-                ail.append({"k": ail_key, "v": AILMENT_MAP[ail_key]})
+            dup = next((a for a in ail if a["k"] == ail_key), None)
+            if dup:
+                if dup.get("o") == "LS" and kind != "LS":
+                    dup.pop("o", None)  # スキルでも付与できるならLS限定を外す
+            else:
+                a = {"k": ail_key, "v": AILMENT_MAP[ail_key]}
+                if kind == "LS":
+                    a["o"] = "LS"
+                ail.append(a)
 
         # フィールド効果・モード効果: 倍率がわかっているものだけ倍率行として追加
         if dai == "フィールド効果" and syo in FIELD_MAP:
@@ -127,12 +134,18 @@ def main():
             sk = e.setdefault("sk", [])
             fk = f"フィールド:{syo}"
             if not any(s["k"] == fk for s in sk):
-                sk.append({"v": fv, "r": fr, "k": fk, "t": text})
+                fe = {"v": fv, "r": fr, "k": fk, "t": text}
+                if kind == "LS":
+                    fe["o"] = "LS"
+                sk.append(fe)
         if dai == "モード効果" and syo in MODE_MAP:
             mv, mr = MODE_MAP[syo]
             sk = e.setdefault("sk", [])
             if not any(s["k"] == syo for s in sk):
-                sk.append({"v": mv, "r": mr, "k": syo, "t": text})
+                me = {"v": mv, "r": mr, "k": syo, "t": text}
+                if kind == "LS":
+                    me["o"] = "LS"
+                sk.append(me)
 
         if name_map:
             try:
@@ -148,7 +161,10 @@ def main():
                             dup["v"] = v
                             dup["t"] = text
                     else:
-                        sk.append({"v": v, "r": r[19].strip(), "k": name_map, "t": text})
+                        se = {"v": v, "r": r[19].strip(), "k": name_map, "t": text}
+                        if kind == "LS":
+                            se["o"] = "LS"  # リーダー/サポート配置時のみ有効
+                        sk.append(se)
             except ValueError:
                 pass
 
