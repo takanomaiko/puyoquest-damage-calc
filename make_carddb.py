@@ -71,6 +71,8 @@ def main():
     for r in skill_rows:
         if len(r) < 30 or not r[1].strip():
             continue
+        if not r[0].strip():
+            continue  # レア度が空の行はコラボ区切り等の見出し行でカードではない
         key = (r[1].strip(), r[0].strip())
         e = entries.setdefault(key, {
             "n": r[1].strip(),      # 名称
