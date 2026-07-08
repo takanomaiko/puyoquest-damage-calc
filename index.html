@@ -90,8 +90,11 @@
     background: #fff8dc; box-shadow: 0 0 10px 3px rgba(255, 200, 40, .9);
   }
   .dstar {
-    position: absolute; top: -9px; right: -6px; font-size: 20px; pointer-events: none;
-    filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 5px rgba(255, 200, 40, .9));
+    position: absolute; top: -10px; right: -8px; z-index: 2; pointer-events: none;
+    font-size: 24px; line-height: 1; padding: 3px 4px;
+    background: radial-gradient(circle at 35% 35%, #fffbe0, #ffd93d 75%);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px #fff, 0 0 10px 3px rgba(255, 170, 20, .95);
   }
   /* デッキ全体を横一列で見る帯（ゲームのデッキ画面イメージ） */
   #deckStrip { display: flex; align-items: flex-end; justify-content: center; gap: 5px; margin-bottom: 16px; }
@@ -151,7 +154,7 @@
     .gdmg { font-size: 14px; padding: 2px 0 6px; }
     .gclear { top: 2px; left: 2px; padding: 0 5px; font-size: 10px; line-height: 1.6; }
     .gcombo { top: 2px; right: 2px; font-size: 18px; padding: 3px; }
-    .dstar { top: -7px; right: -4px; font-size: 16px; }
+    .dstar { top: -8px; right: -6px; font-size: 19px; padding: 2px 3px; }
     p.hint { display: none; }  /* 長い説明文は隠す（検索結果内の情報は残す） */
     #resultSection { display: none; }  /* 計算結果の表はスマホでは非表示（カードの数字タップで詳細） */
     .row-name { width: 8em; font-size: 12px; }
