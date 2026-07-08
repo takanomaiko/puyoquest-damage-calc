@@ -185,7 +185,7 @@
       <h3>敵の盾・共通設定</h3>
       <div class="setline">盾 <select id="enemyShield"></select></div>
       <div class="setline" id="supportAtkLine">応援デッキ攻撃 + <input type="number" id="supportAtk" step="10"></div>
-      <div class="setline">主属性係数 <input type="number" id="coefMain"> 副属性係数 <input type="number" id="coefSub"></div>
+      <div class="setline">属性係数（固定値）<strong>主属性 ×1／副属性 ×1/3</strong></div>
     </div>
     <div class="setcard">
       <h3>その他</h3>
@@ -258,6 +258,11 @@
 
 const COLORS = ["赤", "青", "緑", "黄", "紫"];
 const SUB_COLORS = ["なし", ...COLORS];
+// 属性係数（ぷよクエの固定値）：主属性で発生する攻撃値は等倍、副属性は1/3
+// （「攻撃値up&副属性等倍化」のようなスキルは、この1/3を等倍に引き上げる効果）
+const COEF_MAIN = 1;
+const COEF_SUB = 1 / 3;
+
 const AFFINITY = {
   赤: { 緑: 2, 青: 0.5 }, 青: { 赤: 2, 緑: 0.5 }, 緑: { 青: 2, 赤: 0.5 },
   黄: { 紫: 2 }, 紫: { 黄: 2 },
@@ -278,7 +283,7 @@ function sampleState() {
     deckName: "",
     cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, hp: 0, rcv: 0, main: "赤", sub: "なし", img: "", combo: false })),
     enemyColor: "緑", enemyShield: "盾なし", statType: "atk",
-    supportAtk: 500, coefMain: 3, coefSub: 1,
+    supportAtk: 500,
     rows: [
       { name: "リーダースキル", on: true, cells: emptyCells() },
       { name: "サポートリーダー", on: true, cells: emptyCells() },
@@ -317,8 +322,8 @@ function calc() {
   const results = state.cards.map((card, i) => {
     const hasSub = card.sub && card.sub !== "なし";
     const base = (Number(card[state.statType || "atk"]) || 0) + (Number(state.supportAtk) || 0);
-    let m = base * (Number(state.coefMain) || 0);
-    let s = hasSub ? base * (Number(state.coefSub) || 0) : 0;
+    let m = base * COEF_MAIN;
+    let s = hasSub ? base * COEF_SUB : 0;
     for (const row of state.rows) {
       if (!row.on) continue;
       m *= cellValue(row.cells[i].m);
@@ -776,7 +781,7 @@ function renderSettings() {
   Object.keys(SHIELDS).forEach((s) => es.appendChild(new Option(s, s, false, s === state.enemyShield)));
   es.onchange = () => { state.enemyShield = es.value; renderHeader(); saveState(); };
 
-  for (const [id, key] of [["#supportAtk", "supportAtk"], ["#coefMain", "coefMain"], ["#coefSub", "coefSub"]]) {
+  for (const [id, key] of [["#supportAtk", "supportAtk"]]) {
     const el = $(id);
     el.value = state[key];
     el.oninput = () => { state[key] = Number(el.value) || 0; renderHeader(); saveState(); };

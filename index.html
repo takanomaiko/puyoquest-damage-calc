@@ -216,14 +216,11 @@
       <label id="supportAtkLabel">応援デッキ攻撃 +
         <input type="number" id="supportAtk" step="10">
       </label>
-      <label>主属性係数
-        <input type="number" id="coefMain" step="1">
-      </label>
-      <label>副属性係数
-        <input type="number" id="coefSub" step="1">
+      <label>属性係数（固定値）
+        <span style="font-weight:600">主属性 ×1／副属性 ×1/3</span>
       </label>
     </div>
-    <p class="hint" id="calcHint">計算式：（攻撃力＋応援）× 係数 × 各倍率 × 属性相性 × 盾。副属性は主属性の1/3（係数3対1）で計算されます。</p>
+    <p class="hint" id="calcHint">計算式：（攻撃力＋応援）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。</p>
   </section>
 
   <section>
@@ -296,6 +293,11 @@ const COLORS = ["赤", "青", "緑", "黄", "紫"];
 const SUB_COLORS = ["なし", ...COLORS];
 
 // 属性相性（攻撃側 → 敵属性 → 倍率、表にないものは1倍）
+// 属性係数（ぷよクエの固定値）：主属性で発生する攻撃値は等倍、副属性は1/3
+// （「攻撃値up&副属性等倍化」のようなスキルは、この1/3を等倍に引き上げる効果）
+const COEF_MAIN = 1;
+const COEF_SUB = 1 / 3;
+
 const AFFINITY = {
   赤: { 緑: 2, 青: 0.5 },
   青: { 赤: 2, 緑: 0.5 },
@@ -328,8 +330,6 @@ function sampleState() {
     enemyShield: "盾なし",
     statType: "atk",
     supportAtk: 500,
-    coefMain: 3,
-    coefSub: 1,
     rows: [
       { name: "リーダースキル",   on: true, cells: emptyCells() },
       { name: "サポートリーダー", on: true, cells: emptyCells() },
@@ -376,8 +376,8 @@ function calc() {
   const results = state.cards.map((card, i) => {
     const hasSub = card.sub && card.sub !== "なし";
     const base = (Number(card[state.statType || "atk"]) || 0) + (Number(state.supportAtk) || 0);
-    let m = base * (Number(state.coefMain) || 0);
-    let s = hasSub ? base * (Number(state.coefSub) || 0) : 0;
+    let m = base * COEF_MAIN;
+    let s = hasSub ? base * COEF_SUB : 0;
     for (const row of state.rows) {
       if (!row.on) continue;
       m *= cellValue(row.cells[i].m);
@@ -1000,7 +1000,7 @@ function updateStatLabels() {
   const labelEl = $("#supportAtkLabel");
   if (labelEl) labelEl.childNodes[0].textContent = `応援デッキ${label} +`;
   const hint = $("#calcHint");
-  if (hint) hint.textContent = `計算式：（${label}＋応援）× 係数 × 各倍率 × 属性相性 × 盾。副属性は主属性の1/3（係数3対1）で計算されます。`;
+  if (hint) hint.textContent = `計算式：（${label}＋応援）× 属性係数（主×1／副×1/3）× 各倍率 × 属性相性 × 盾。`;
 }
 
 function renderCommon() {
@@ -1030,7 +1030,7 @@ function renderCommon() {
   Object.keys(SHIELDS).forEach((s) => es.appendChild(new Option(s, s, false, s === state.enemyShield)));
   es.onchange = () => { state.enemyShield = es.value; renderResults(); saveState(); };
 
-  for (const [id, key] of [["#supportAtk", "supportAtk"], ["#coefMain", "coefMain"], ["#coefSub", "coefSub"]]) {
+  for (const [id, key] of [["#supportAtk", "supportAtk"]]) {
     const el = $(id);
     el.value = state[key];
     el.oninput = () => { state[key] = Number(el.value) || 0; renderResults(); saveState(); };
