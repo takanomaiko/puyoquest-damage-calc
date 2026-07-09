@@ -208,6 +208,12 @@
           <option value="rcv">回復</option>
         </select>
       </label>
+      <label>スキル
+        <select id="skillMode">
+          <option value="normal">ノーマルスキル</option>
+          <option value="fullpower">フルパワースキル</option>
+        </select>
+      </label>
       <label>敵の属性
         <select id="enemyColor"></select>
       </label>
@@ -348,6 +354,7 @@ function sampleState() {
     enemyColor: "緑",
     enemyShield: "盾なし",
     statType: "atk",
+    skillMode: "normal",
     colorConfig: defaultColorConfig(),
     rows: [
       { name: "リーダースキル",   on: true, cells: emptyCells() },
@@ -580,8 +587,8 @@ function applySkillRows(slot, c) {
       name: s.k,
       on: true,
       auto: slot,
-      sk: { v: s.v, r: s.r || "" },
-      info: { card: c.n, img: c.u || "", txt: s.t || "" },
+      sk: { v: s.v, r: s.r || "", fv: s.fv },
+      info: { card: c.n, img: c.u || "", txt: s.t || "", fptxt: s.ft || "" },
       cells: [],
     });
   }
@@ -692,12 +699,14 @@ function refreshAutoRows() {
     if (!info) continue;
     const slot = row.sk ? row.auto : row.ls.slot;
     const srcColor = state.cards[slot].main;
+    // フルパワーモードで、その行にフルパワー倍率(fv)があればそちらを使う
+    const useVal = (state.skillMode === "fullpower" && info.fv != null) ? info.fv : info.v;
     row.cells = state.cards.map((cd, j) => {
       let hit;
       if (info.r === "自身のみ") hit = j === slot;
       else if (info.r === "隣接") hit = Math.abs(j - slot) <= 1; // 自身とデッキの並びで隣のカード
       else hit = skillRangeMatches(info.r, srcColor, cd);
-      const v = hit ? String(info.v) : "";
+      const v = hit ? String(useVal) : "";
       return { m: v, s: v };
     });
   }
@@ -1107,6 +1116,16 @@ function renderCommon() {
     saveState();
   };
   updateStatLabels();
+
+  const sm = $("#skillMode");
+  sm.value = state.skillMode || "normal";
+  sm.onchange = () => {
+    state.skillMode = sm.value;
+    refreshAutoRows();     // フルパワー倍率で自動行を再計算
+    renderMultTable();
+    renderResults();
+    saveState();
+  };
 
   const ec = $("#enemyColor");
   ec.innerHTML = "";

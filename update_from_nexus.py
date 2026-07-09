@@ -128,7 +128,16 @@ def classify_enhance(text):
     return "攻撃エンハ"
 
 
-def parse_skills(jpase, jplse):
+def _atk_mults(text):
+    """効果文から攻撃倍率を全部取り出す（n倍 と n％アップ の両方に対応）"""
+    vals = []
+    for num, unit in re.findall(r"(?:攻撃力|攻撃値)を([\d.]+)(倍|％アップ|%アップ)", text):
+        v = float(num)
+        vals.append(v if unit == "倍" else round(1 + v / 100, 3))
+    return vals
+
+
+def parse_skills(jpase, jplse, jpasfe=""):
     """日本語の効果文から、ダメージ倍率を簡易判定する（Wiki自動判定）"""
     sk = []
     ail = []
@@ -142,16 +151,18 @@ def parse_skills(jpase, jplse):
         return "味方全体"
 
     if jpase:
-        # 「n倍」と「n％アップ」(=1+n/100倍)の両方の表記に対応
-        vals = []
-        for num, unit in re.findall(r"(?:攻撃力|攻撃値)を([\d.]+)(倍|％アップ|%アップ)", jpase):
-            v = float(num)
-            vals.append(v if unit == "倍" else round(1 + v / 100, 3))
+        vals = _atk_mults(jpase)
         if vals and min(vals) > 1:
             k = classify_enhance(jpase)
             # 「隣接」はデッキの並びで自身と隣のカードに適用（アプリ側で判定）
             r = "隣接" if k == "攻撃エンハ(隣接)" else color_range(jpase)
-            sk.append({"v": min(vals), "r": r, "k": k, "t": jpase})
+            entry = {"v": min(vals), "r": r, "k": k, "t": jpase}
+            # フルパワースキル(jpasfe)の攻撃倍率が高ければ fv として保持
+            fvals = _atk_mults(jpasfe)
+            if fvals and max(fvals) > entry["v"]:
+                entry["fv"] = max(fvals)
+                entry["ft"] = jpasfe
+            sk.append(entry)
         m = re.search(r"受けるダメージを([\d.]+)倍", jpase)
         if m and float(m.group(1)) > 1:
             sk.append({"v": float(m.group(1)), "r": "味方全体", "k": "被ダメアップ", "t": jpase})
@@ -293,7 +304,8 @@ def main():
             code = int(re.search(r"(\d+)", p["title"]).group(1))
             jpase = strip_wiki(f.get("jpase", ""))
             jplse = strip_wiki(f.get("jplse", ""))
-            sk, ail, lm, lr = parse_skills(jpase, jplse)
+            jpasfe = strip_wiki(f.get("jpasfe", ""))
+            sk, ail, lm, lr = parse_skills(jpase, jplse, jpasfe)
             sk.extend(parse_tokumori(f))  # とくもりスキル・きらめきオーラ
             card = {
                 "code": code,

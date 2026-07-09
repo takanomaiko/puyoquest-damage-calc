@@ -184,6 +184,10 @@
       <div class="colorbtns" id="statTypeBtns"></div>
     </div>
     <div class="setcard">
+      <h3>スキル</h3>
+      <div class="colorbtns" id="skillModeBtns"></div>
+    </div>
+    <div class="setcard">
       <h3>敵の属性</h3>
       <div class="colorbtns" id="enemyColors"></div>
     </div>
@@ -307,7 +311,7 @@ function sampleState() {
   return {
     deckName: "",
     cards: Array.from({ length: 6 }, () => ({ name: "", atk: 0, hp: 0, rcv: 0, main: "赤", sub: "なし", img: "", combo: false })),
-    enemyColor: "緑", enemyShield: "盾なし", statType: "atk",
+    enemyColor: "緑", enemyShield: "盾なし", statType: "atk", skillMode: "normal",
     colorConfig: defaultColorConfig(),
     rows: [
       { name: "リーダースキル", on: true, cells: emptyCells() },
@@ -423,8 +427,8 @@ function applySkillRows(slot, c) {
     if (s.o === "LS" && slot !== 0 && slot !== 5) continue;
     state.rows.push({
       name: s.k, on: true, auto: slot,
-      sk: { v: s.v, r: s.r || "" },
-      info: { card: c.n, img: c.u || "", txt: s.t || "" },
+      sk: { v: s.v, r: s.r || "", fv: s.fv },
+      info: { card: c.n, img: c.u || "", txt: s.t || "", fptxt: s.ft || "" },
       cells: [],
     });
   }
@@ -436,12 +440,14 @@ function refreshAutoRows() {
     if (!info) continue;
     const slot = row.sk ? row.auto : row.ls.slot;
     const srcColor = state.cards[slot].main;
+    // フルパワーモードで、その行にフルパワー倍率(fv)があればそちらを使う
+    const useVal = (state.skillMode === "fullpower" && info.fv != null) ? info.fv : info.v;
     row.cells = state.cards.map((cd, j) => {
       let hit;
       if (info.r === "自身のみ") hit = j === slot;
       else if (info.r === "隣接") hit = Math.abs(j - slot) <= 1;
       else hit = skillRangeMatches(info.r, srcColor, cd);
-      const v = hit ? String(info.v) : "";
+      const v = hit ? String(useVal) : "";
       return { m: v, s: v };
     });
   }
@@ -850,6 +856,24 @@ function renderSettings() {
     stBox.appendChild(b);
   });
   updateStatLabels();
+
+  const smBox = $("#skillModeBtns");
+  smBox.innerHTML = "";
+  const skillNames = { normal: "ノーマルスキル", fullpower: "フルパワースキル" };
+  Object.keys(skillNames).forEach((key) => {
+    const b = document.createElement("button");
+    b.textContent = skillNames[key];
+    b.style.background = "var(--accent)";
+    b.style.fontSize = "12px";
+    b.className = (state.skillMode || "normal") === key ? "sel" : "";
+    b.addEventListener("click", () => {
+      state.skillMode = key;
+      refreshAutoRows();
+      renderAll();
+      saveState();
+    });
+    smBox.appendChild(b);
+  });
 
   const box = $("#enemyColors");
   box.innerHTML = "";

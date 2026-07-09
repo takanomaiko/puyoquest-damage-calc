@@ -156,12 +156,17 @@ def main():
                     v = round(1 + v / 100, 3)              # 「50」→「1.5倍」に換算
                 if v > 1:
                     sk = e.setdefault("sk", [])
-                    # 同名スキルはフルパワー版などの重複 → 小さい方＝通常版を残す
+                    # 同名スキルの重複はノーマル/フルパワーの違い
+                    # → 小さい方=通常(v)、大きい方=フルパワー(fv) として両方残す
                     dup = next((s for s in sk if s["k"] == name_map), None)
                     if dup:
-                        if v < dup["v"]:
-                            dup["v"] = v
-                            dup["t"] = text
+                        vals = [dup["v"], dup.get("fv", dup["v"]), v]
+                        lo, hi = min(vals), max(vals)
+                        dup["v"] = lo
+                        if hi > lo:
+                            dup["fv"] = hi
+                            if v == hi:
+                                dup["ft"] = text  # フルパワー版の効果文
                     else:
                         se = {"v": v, "r": r[19].strip(), "k": name_map, "t": text}
                         if kind == "LS":
