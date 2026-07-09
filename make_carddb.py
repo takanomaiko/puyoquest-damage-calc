@@ -83,8 +83,11 @@ def main():
             "u": r[8].strip(),      # 画像URL
         })
         kind, text = r[16].strip(), r[29].strip()
-        if kind == "NS" and "ns" not in e and text:
-            e["ns"] = text
+        if kind == "NS" and text:
+            if "ns" not in e:
+                e["ns"] = text                     # 最初のNS＝ノーマルスキル
+            elif e["ns"] != text and "fp" not in e:
+                e["fp"] = text                     # 効果文が異なる2つ目のNS＝フルパワースキル
         if kind == "LS" and "ls" not in e and text:
             e["ls"] = text
         if kind == "TS" and "ts" not in e and text:
