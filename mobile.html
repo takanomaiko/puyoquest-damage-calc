@@ -663,7 +663,10 @@ function renderRows() {
       q.className = "small";
       q.addEventListener("click", (e) => {
         e.stopPropagation();
-        openSkillModal(`${row.name}（${row.info.card}）`, row.info.txt);
+        // フルパワーモードで、その行がフルパワー倍率を使っていればフルパワーの効果文を表示
+        const useFP = state.skillMode === "fullpower" && row.sk && row.sk.fv != null && row.info.fptxt;
+        const title = `${row.name}（${row.info.card}）${useFP ? "【フルパワー】" : ""}`;
+        openSkillModal(title, useFP ? row.info.fptxt : row.info.txt);
       });
       head.appendChild(q);
     }
