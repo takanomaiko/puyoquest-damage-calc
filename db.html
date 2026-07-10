@@ -56,6 +56,10 @@
       <option value="">全レア</option>
       <option value="7">★7</option><option value="6">★6</option><option value="5">★5</option>
     </select>
+    <select id="fType">
+      <option value="">全タイプ</option>
+      <option>こうげき</option><option>たいりょく</option><option>かいふく</option><option>バランス</option>
+    </select>
     <select id="fSrc">
       <option value="">全出典</option>
       <option value="sheet">シート</option>
@@ -89,11 +93,13 @@ function filterCards() {
   const q = $("#q").value.trim();
   const fc = $("#fColor").value;
   const fr = $("#fRarity").value;
+  const ft = $("#fType").value;
   const fs = $("#fSrc").value;
   return CARD_DB.filter((c) => {
     if (q && !c.n.includes(q)) return false;
     if (fc && COLOR_NUM[c.m] !== fc && COLOR_NUM[c.s] !== fc) return false;
     if (fr && c.r !== fr) return false;
+    if (ft && c.t !== ft) return false;
     if (fs === "wiki" && !c.w) return false;
     if (fs === "sheet" && c.w) return false;
     return true;
@@ -152,7 +158,7 @@ function refresh() {
   renderMore();
 }
 
-["#q", "#fColor", "#fRarity", "#fSrc"].forEach((id) => {
+["#q", "#fColor", "#fRarity", "#fType", "#fSrc"].forEach((id) => {
   $(id).addEventListener("input", refresh);
 });
 $("#moreBtn").addEventListener("click", renderMore);
