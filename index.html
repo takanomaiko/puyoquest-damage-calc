@@ -244,7 +244,8 @@
     <h2>倍率設定</h2>
     <p class="hint">
       空欄は「×1（効果なし）」として扱います。行頭のチェックを外すとその行を無視します（ON/OFF比較に便利）。<br>
-      「全体」に数値を入れて「反映」を押すと、その行の全カードに同じ値が入ります。
+      「全体」に数値を入れて「反映」を押すと、選んだ色・タイプに当てはまるカードに値が入ります（対象外のカードは空欄になります）。<br>
+      「全色・全タイプ」のままなら全カードに入ります。色は副属性のカードにも当てはまります。
     </p>
     <div class="scroll">
       <table id="multTable">
@@ -559,6 +560,16 @@ function skillRangeMatches(range, srcColor, target) {
   if (range.includes("同色")) return target.main === srcColor || sub === srcColor;
   const colors = COLORS.filter((col) => range.includes(col));
   if (colors.length) return colors.includes(target.main) || (sub && colors.includes(sub));
+  return true;
+}
+
+// 「反映」ボタンの対象判定（選んだ色・タイプの両方に当てはまるカードだけ）
+// 色は副属性のカードにも当てはまる（スキルの範囲判定と同じ考え方）
+const APPLY_TYPES = ["全タイプ", "こうげき", "たいりょく", "かいふく", "バランス"];
+function applyTargetMatches(card, color, type) {
+  const sub = card.sub && card.sub !== "なし" ? card.sub : null;
+  if (color !== "全色" && card.main !== color && sub !== color) return false;
+  if (type !== "全タイプ" && card.type !== type) return false;
   return true;
 }
 
@@ -1223,18 +1234,29 @@ function renderMultTable() {
     allInput.type = "number";
     allInput.className = "cell";
     allInput.step = "0.1";
+    const colorSel = document.createElement("select");
+    ["全色", ...COLORS].forEach((c) => colorSel.appendChild(new Option(c, c)));
+    colorSel.title = "反映する対象の色（副属性も対象）";
+    const typeSel = document.createElement("select");
+    APPLY_TYPES.forEach((t) => typeSel.appendChild(new Option(t, t)));
+    typeSel.title = "反映する対象のタイプ";
     const applyBtn = document.createElement("button");
     applyBtn.textContent = "反映";
     applyBtn.className = "small";
     applyBtn.addEventListener("click", () => {
       const v = allInput.value;
-      row.cells.forEach((cell) => { cell.m = v; cell.s = v; });
+      // 対象のカードに値を入れ、対象外は空にする（1行＝1つの効果として作り直す）
+      row.cells = state.cards.map((card) =>
+        applyTargetMatches(card, colorSel.value, typeSel.value) ? { m: v, s: v } : { m: "", s: "" });
       delete row.sk; delete row.ls; delete row.st; // 手で入れた値を自動更新で上書きしない
       renderMultTable();
       renderResults();
       saveState();
     });
-    tdAll.append(allInput, document.createTextNode(" "), applyBtn);
+    const targetLine = document.createElement("div");
+    targetLine.style.marginTop = "4px";
+    targetLine.append(colorSel, document.createTextNode(" "), typeSel);
+    tdAll.append(allInput, document.createTextNode(" "), applyBtn, targetLine);
 
     tr.append(tdName, tdOn, tdAll);
 

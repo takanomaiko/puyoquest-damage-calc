@@ -112,6 +112,7 @@
   .rowbody input.cell { width: 4.2em; text-align: right; }
   .rowtools { display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
   .rowtools input[type="text"] { flex: 1; min-width: 8em; }
+  .rowtools select { font-size: 13px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
   button.small { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
   button.danger { background: #c0392b; }
 
@@ -408,6 +409,16 @@ function skillRangeMatches(range, srcColor, target) {
   if (range.includes("同色")) return target.main === srcColor || sub === srcColor;
   const colors = COLORS.filter((col) => range.includes(col));
   if (colors.length) return colors.includes(target.main) || (sub && colors.includes(sub));
+  return true;
+}
+
+// 「反映」ボタンの対象判定（選んだ色・タイプの両方に当てはまるカードだけ）
+// 色は副属性のカードにも当てはまる（スキルの範囲判定と同じ考え方）
+const APPLY_TYPES = ["全タイプ", "こうげき", "たいりょく", "かいふく", "バランス"];
+function applyTargetMatches(card, color, type) {
+  const sub = card.sub && card.sub !== "なし" ? card.sub : null;
+  if (color !== "全色" && card.main !== color && sub !== color) return false;
+  if (type !== "全タイプ" && card.type !== type) return false;
   return true;
 }
 function applySkillRows(slot, c) {
@@ -732,12 +743,19 @@ function renderRows() {
     allInput.type = "number";
     allInput.step = "0.1";
     allInput.className = "cell";
-    allInput.placeholder = "全体";
+    allInput.placeholder = "倍率";
+    const colorSel = document.createElement("select");
+    ["全色", ...COLORS].forEach((c) => colorSel.appendChild(new Option(c, c)));
+    const typeSel = document.createElement("select");
+    APPLY_TYPES.forEach((t) => typeSel.appendChild(new Option(t, t)));
     const applyBtn = document.createElement("button");
-    applyBtn.textContent = "全体に反映";
+    applyBtn.textContent = "反映";
     applyBtn.className = "small";
     applyBtn.addEventListener("click", () => {
-      row.cells.forEach((cell) => { cell.m = allInput.value; cell.s = allInput.value; });
+      const v = allInput.value;
+      // 対象のカードに値を入れ、対象外は空にする（1行＝1つの効果として作り直す）
+      row.cells = state.cards.map((card) =>
+        applyTargetMatches(card, colorSel.value, typeSel.value) ? { m: v, s: v } : { m: "", s: "" });
       delete row.sk; delete row.ls; delete row.st; delete row.combo;
       renderAll();
       saveState();
@@ -752,7 +770,7 @@ function renderRows() {
       renderAll();
       saveState();
     });
-    tools.append(nameInput, allInput, applyBtn, delBtn);
+    tools.append(nameInput, allInput, colorSel, typeSel, applyBtn, delBtn);
     body.appendChild(tools);
     item.appendChild(body);
 
