@@ -404,6 +404,16 @@ def main():
                 if syo == "クリティカル倍率up" and v >= 5:
                     v = round(1 + v / 100, 3)              # 「50」→「1.5倍」に換算
                 if v > 1:
+                    # 隣接エンハ（影山飛雄など）: 行名を「攻撃エンハ(隣接)」に統一し、
+                    # 範囲をアプリが解釈できる表記に揃える
+                    rng = r[19].strip()
+                    if "隣接" in rng:
+                        if name_map == "攻撃エンハ":
+                            name_map = "攻撃エンハ(隣接)"
+                        rng = {"隣接内": "隣接",          # 自身と両隣
+                               "隣接内同色": "隣接同色",   # 自身と、両隣のうち同色のカード
+                               "隣接": "両隣のみ",         # 自身を含まない（シャイニールミナス等）
+                               }.get(rng, rng)
                     sk = e.setdefault("sk", [])
                     # 同名スキルの重複はノーマル/フルパワーの違い
                     # → 小さい方=通常(v)、大きい方=フルパワー(fv) として両方残す
@@ -417,7 +427,7 @@ def main():
                             if v == hi:
                                 dup["ft"] = text  # フルパワー版の効果文
                     else:
-                        se = {"v": v, "r": r[19].strip(), "k": name_map, "t": text}
+                        se = {"v": v, "r": rng, "k": name_map, "t": text}
                         if kind == "LS":
                             se["o"] = "LS"  # リーダー/サポート配置時のみ有効
                         cats = cat_ids(dai, syo, text)
@@ -518,6 +528,16 @@ def main():
                 cats = classify_text(entry.get(src_key, ""))
                 if cats:
                     entry[dst_key] = cats
+            # Wiki由来の隣接エンハ: 効果文から「自身を含むか」「同色限定か」を判定して範囲を揃える
+            for s in entry.get("sk", []):
+                if s.get("k") == "攻撃エンハ(隣接)":
+                    t = s.get("t", "")
+                    if re.search(r"隣接する[赤青緑黄紫]属性", t):
+                        s["r"] = "隣接同色"          # 自身と、両隣のうち同色のカード
+                    elif "このカードと" in t:
+                        s["r"] = "隣接"              # 自身と両隣
+                    else:
+                        s["r"] = "両隣のみ"          # 自身を含まない
             # Wiki由来の倍率スキルにも行の名前から分類IDを付ける
             for s in entry.get("sk", []):
                 for pat, cat in (("攻撃エンハ", "攻撃力アップ"), ("同時攻撃", "条件達成で攻撃力アップ"),

@@ -498,7 +498,10 @@ function refreshAutoRows() {
     row.cells = state.cards.map((cd, j) => {
       let hit;
       if (info.r === "自身のみ") hit = j === slot;
-      else if (info.r === "隣接") hit = Math.abs(j - slot) <= 1;
+      else if (info.r === "隣接" || info.r === "隣接内") hit = Math.abs(j - slot) <= 1; // 自身と両隣
+      else if (info.r === "両隣のみ") hit = Math.abs(j - slot) === 1; // 自身を含まない（シャイニールミナス等）
+      else if (info.r === "隣接同色" || info.r === "隣接内同色")
+        hit = j === slot || (Math.abs(j - slot) === 1 && skillRangeMatches("同色", srcColor, cd)); // 自身と両隣の同色
       else hit = skillRangeMatches(info.r, srcColor, cd);
       const v = hit ? String(useVal) : "";
       return { m: v, s: v };

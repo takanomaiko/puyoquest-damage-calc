@@ -154,8 +154,16 @@ def parse_skills(jpase, jplse, jpasfe=""):
         vals = _atk_mults(jpase)
         if vals and min(vals) > 1:
             k = classify_enhance(jpase)
-            # 「隣接」はデッキの並びで自身と隣のカードに適用（アプリ側で判定）
-            r = "隣接" if k == "攻撃エンハ(隣接)" else color_range(jpase)
+            # 隣接エンハはデッキの並びで判定（アプリ側）。効果文から範囲の種類を見分ける
+            if k == "攻撃エンハ(隣接)":
+                if re.search(r"隣接する[赤青緑黄紫]属性", jpase):
+                    r = "隣接同色"      # 自身と、両隣のうち同色のカード
+                elif "このカードと" in jpase:
+                    r = "隣接"          # 自身と両隣
+                else:
+                    r = "両隣のみ"      # 自身を含まない
+            else:
+                r = color_range(jpase)
             entry = {"v": min(vals), "r": r, "k": k, "t": jpase}
             # フルパワースキル(jpasfe)の攻撃倍率が高ければ fv として保持
             fvals = _atk_mults(jpasfe)
