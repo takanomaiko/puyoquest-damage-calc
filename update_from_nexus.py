@@ -176,6 +176,10 @@ def parse_skills(jpase, jplse, jpasfe=""):
         m = re.search(r"受けるダメージを([\d.]+)倍", jpase)
         if m and float(m.group(1)) > 1:
             sk.append({"v": float(m.group(1)), "r": "味方全体", "k": "被ダメアップ", "t": jpase})
+        # 倍率付き攻撃属性変化（「通常攻撃をn倍の◯属性攻撃に変える」）: 全カードに入れる
+        m = re.search(r"通常攻撃を([\d.]+)倍の[赤青緑黄紫自]属性攻撃に変え", jpase)
+        if m and float(m.group(1)) > 1:
+            sk.append({"v": float(m.group(1)), "r": "味方全体", "k": "攻撃属性変化", "t": jpase})
         # 指定属性被ダメアップ（受ける◯属性ダメージをn倍）: 対象の色を範囲に入れ、
         # 主属性/副属性それぞれのダメージ属性で判定する印(pa)を付ける
         m = re.search(r"受ける(.{1,12}?)属性ダメージを([\d.]+)倍", jpase)
