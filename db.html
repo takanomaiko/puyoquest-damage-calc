@@ -7,29 +7,45 @@
 <style>
   :root {
     --red: #e74c3c; --blue: #3498db; --green: #27ae60; --yellow: #f1c40f; --purple: #9b59b6;
-    --bg: #f4f6fa; --border: #dde3ec; --text: #2c3e50; --sub: #7f8c9b; --accent: #5b6ee1;
+    --bg: #eef1f8; --border: #e3e8f3; --text: #2b3550; --sub: #8590a6;
+    --accent: #5b6ee1; --accent-2: #7d5fe8;
+    --grad: linear-gradient(135deg, var(--accent), var(--accent-2));
+    --shadow-sm: 0 1px 2px rgba(35, 45, 90, .06);
+    --shadow-md: 0 2px 6px rgba(35, 45, 90, .08), 0 12px 28px -14px rgba(35, 45, 90, .18);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Hiragino Sans", "Yu Gothic", sans-serif; background: var(--bg); color: var(--text); }
-  header { position: sticky; top: 0; z-index: 10; background: var(--accent); color: #fff; padding: 10px 12px; }
-  header h1 { font-size: 15px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  body {
+    margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    background: linear-gradient(180deg, #e9edf7 0%, var(--bg) 280px); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10; background: var(--grad); color: #fff; padding: 10px 12px;
+    box-shadow: 0 2px 12px rgba(70, 80, 180, .28);
+  }
+  header h1 { font-size: 15px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; letter-spacing: .03em; }
   header h1 a { color: #fff; font-size: 12px; font-weight: normal; }
   .controls { display: flex; gap: 6px; flex-wrap: wrap; }
   .controls input, .controls select {
-    font-size: 14px; padding: 7px; border: none; border-radius: 8px;
+    font-size: 14px; padding: 7px 9px; border: none; border-radius: 9px; color: var(--text);
   }
+  .controls input:focus, .controls select:focus { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, .45); }
   .controls input { flex: 1; min-width: 10em; }
   main { max-width: 720px; margin: 0 auto; padding: 10px; }
-  #count { font-size: 12px; color: var(--sub); margin: 4px 2px 8px; }
-  .item { background: #fff; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; overflow: hidden; }
-  .ihead { display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; }
+  #count { font-size: 12px; color: var(--sub); margin: 6px 2px 8px; }
+  .item {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 7px; overflow: hidden;
+    box-shadow: var(--shadow-sm); transition: box-shadow .15s;
+  }
+  .item:hover { box-shadow: var(--shadow-md); }
+  .ihead { display: flex; align-items: center; gap: 10px; padding: 9px 11px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .ihead img { width: 44px; height: 44px; object-fit: contain; flex: none; border-radius: 6px; }
   .iinfo { flex: 1; min-width: 0; }
   .iname { font-size: 13px; font-weight: 700; }
   .imeta { font-size: 11px; color: var(--sub); margin-top: 2px; }
   .iatk { flex: none; text-align: right; font-size: 13px; font-weight: 700; color: var(--accent); }
   .iatk small { display: block; font-weight: normal; color: var(--sub); font-size: 10px; }
-  .badge { display: inline-block; padding: 0 5px; border-radius: 4px; color: #fff; font-size: 10px; }
+  .badge { display: inline-block; padding: 0 6px; border-radius: 999px; color: #fff; font-size: 10px; font-weight: 700; }
   .c赤 { background: var(--red); } .c青 { background: var(--blue); } .c緑 { background: var(--green); }
   .c黄 { background: var(--yellow); color: #333; } .c紫 { background: var(--purple); }
   .ibody { display: none; border-top: 1px solid var(--border); padding: 10px 12px; background: #fafbfe; font-size: 12px; line-height: 1.7; }
@@ -38,7 +54,12 @@
   .lbl.sub { background: #8a93a8; }
   .skrow { font-size: 12px; margin: 2px 0; }
   .skcats { font-size: 11px; color: var(--sub); margin-top: 2px; }
-  #moreBtn { display: block; width: 100%; padding: 12px; margin: 8px 0 20px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
+  #moreBtn {
+    display: block; width: 100%; padding: 12px; margin: 8px 0 20px; background: var(--grad); color: #fff;
+    border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(91, 110, 225, .3); transition: filter .15s, transform .1s;
+  }
+  #moreBtn:active { transform: translateY(1px); filter: brightness(.95); }
   .dl { text-align: center; font-size: 12px; margin: 12px 0 30px; color: var(--sub); }
   .dl a { color: var(--accent); font-weight: 700; }
 </style>

@@ -7,49 +7,64 @@
 <style>
   :root {
     --red: #e74c3c; --blue: #3498db; --green: #27ae60; --yellow: #f1c40f; --purple: #9b59b6;
-    --bg: #f4f6fa; --card-bg: #ffffff; --border: #dde3ec; --text: #2c3e50; --sub: #7f8c9b;
-    --accent: #5b6ee1;
+    --bg: #eef1f8; --card-bg: #ffffff; --border: #e3e8f3; --text: #2b3550; --sub: #8590a6;
+    --accent: #5b6ee1; --accent-2: #7d5fe8;
+    --grad: linear-gradient(135deg, var(--accent), var(--accent-2));
+    --shadow-sm: 0 1px 2px rgba(35, 45, 90, .06);
+    --shadow-md: 0 2px 6px rgba(35, 45, 90, .08), 0 12px 28px -14px rgba(35, 45, 90, .18);
+    --ring: 0 0 0 3px rgba(91, 110, 225, .16);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Hiragino Sans", "Yu Gothic", sans-serif; background: var(--bg); color: var(--text); }
+  body {
+    margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    background: linear-gradient(180deg, #e9edf7 0%, var(--bg) 280px); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
   input, select, button { font-family: inherit; }
+  input:focus, select:focus { outline: none; border-color: var(--accent) !important; box-shadow: var(--ring); }
 
   /* 上部固定: デッキ名 + 合計 */
   header {
     position: sticky; top: 0; z-index: 20;
-    background: var(--accent); color: #fff; padding: 8px 12px 10px; text-align: center;
+    background: var(--grad); color: #fff; padding: 8px 12px 10px; text-align: center;
+    box-shadow: 0 2px 12px rgba(70, 80, 180, .28);
   }
   #deckName {
     width: 100%; text-align: center; font-size: 15px; font-weight: 700; color: #fff;
     background: transparent; border: none; border-bottom: 1px dashed rgba(255,255,255,.5); padding: 2px;
   }
   #deckName::placeholder { color: rgba(255,255,255,.6); }
-  #deckName:focus { outline: none; border-bottom: 1px solid #fff; }
+  #deckName:focus { outline: none; border-bottom: 1px solid #fff; box-shadow: none; }
   #totalBar { font-size: 13px; margin-top: 4px; }
-  #totalBar strong { font-size: 30px; margin-left: 6px; letter-spacing: 1px; }
+  #totalBar strong { font-size: 30px; margin-left: 6px; letter-spacing: .03em; font-weight: 800; text-shadow: 0 1px 3px rgba(10, 15, 60, .25); }
 
-  main { padding: 10px 10px calc(70px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; }
+  main { padding: 12px 10px calc(72px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; }
   .tab { display: none; }
-  .tab.active { display: block; }
+  .tab.active { display: block; animation: tabIn .18s ease; }
+  @keyframes tabIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
   /* 下部タブバー */
   .tabbar {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
-    display: flex; background: #fff; border-top: 1px solid var(--border);
+    display: flex; background: rgba(255, 255, 255, .92);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border); box-shadow: 0 -4px 16px rgba(35, 45, 90, .06);
     padding-bottom: env(safe-area-inset-bottom);
   }
   .tabbar button {
     flex: 1; background: none; border: none; padding: 9px 0 7px; font-size: 11px; color: var(--sub); cursor: pointer;
+    transition: color .15s;
   }
-  .tabbar button .ico { display: block; font-size: 20px; margin-bottom: 1px; }
+  .tabbar button .ico { display: block; font-size: 20px; margin-bottom: 1px; transition: transform .15s; }
   .tabbar button.active { color: var(--accent); font-weight: 700; }
+  .tabbar button.active .ico { transform: translateY(-1px) scale(1.08); }
 
   /* デッキ帯 */
   #deckStrip { display: flex; align-items: flex-end; justify-content: center; gap: 4px; margin-bottom: 12px; }
   .dcard { position: relative; flex: 1 1 0; min-width: 0; text-align: center; }
   .dcard.lead { flex: 1.15 1 0; }
-  .dimg { width: 100%; aspect-ratio: 1/1; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #eef1f8; display: flex; align-items: center; justify-content: center; }
-  .dcard.lead .dimg { border: 2px solid var(--accent); }
+  .dimg { width: 100%; aspect-ratio: 1/1; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: linear-gradient(160deg, #f0f3fa, #e8ecf6); display: flex; align-items: center; justify-content: center; }
+  .dcard.lead .dimg { border: 2px solid var(--accent); box-shadow: 0 0 0 3px rgba(91, 110, 225, .14); }
   .dimg img { width: 100%; height: 100%; object-fit: contain; }
   .dimg .dph { color: var(--sub); font-size: 12px; font-weight: 700; }
   .dlabel { font-size: 9px; font-weight: 700; margin-top: 2px; color: var(--accent); height: 12px; }
@@ -63,11 +78,11 @@
 
   /* カードグリッド */
   #gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .gcard { position: relative; text-align: center; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card-bg); }
-  .gimg { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; background: #eef1f8; cursor: pointer; }
+  .gcard { position: relative; text-align: center; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card-bg); box-shadow: var(--shadow-sm); }
+  .gimg { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #f0f3fa, #e8ecf6); cursor: pointer; }
   .gimg img { width: 100%; height: 100%; object-fit: contain; }
   .gimg .ph { color: var(--sub); font-size: 10px; line-height: 1.6; }
-  .badge { display: inline-block; min-width: 0; padding: 0 4px; border-radius: 4px; color: #fff; font-size: 10px; }
+  .badge { display: inline-block; min-width: 0; padding: 0 6px; border-radius: 999px; color: #fff; font-size: 10px; font-weight: 700; }
   .c赤 { background: var(--red); } .c青 { background: var(--blue); } .c緑 { background: var(--green); }
   .c黄 { background: var(--yellow); color:#333; } .c紫 { background: var(--purple); } .cなし { background: #aaa; }
   .gname { font-size: 11px; font-weight: 600; padding: 4px 4px 0; line-height: 1.3; cursor: pointer; }
@@ -82,7 +97,7 @@
   .scroll { overflow-x: auto; }
   #colorConfigTable { border-collapse: collapse; width: 100%; font-size: 12px; }
   #colorConfigTable th, #colorConfigTable td { border: 1px solid var(--border); padding: 5px 6px; text-align: center; white-space: nowrap; }
-  #colorConfigTable th { background: #eef1f8; font-weight: 600; }
+  #colorConfigTable th { background: #f3f5fc; font-weight: 600; color: #4a556e; }
   #colorConfigTable input[type="number"] { width: 4.2em; text-align: right; font-size: 12px; padding: 4px; }
   th.statActive, td.statActive { background: #e3ecff; }
 
@@ -90,12 +105,22 @@
   .multbar { display: flex; gap: 8px; margin-bottom: 10px; }
   .multbar button { flex: 1; }
   button.act {
-    background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 9px; font-size: 13px; cursor: pointer;
+    background: var(--grad); color: #fff; border: none; border-radius: 10px; padding: 10px; font-size: 13px; cursor: pointer;
+    font-weight: 700; box-shadow: 0 2px 6px rgba(91, 110, 225, .3); transition: filter .15s, transform .1s;
   }
-  button.ghost { background: #fff; color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 9px; font-size: 13px; cursor: pointer; }
-  .rowitem { background: #fff; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  button.act:active { transform: translateY(1px); filter: brightness(.95); }
+  button.ghost {
+    background: #fff; color: var(--accent); border: 1.5px solid rgba(91, 110, 225, .5); border-radius: 10px; padding: 10px;
+    font-size: 13px; cursor: pointer; font-weight: 700; transition: background .15s, transform .1s;
+  }
+  button.ghost:active { background: #f1f4fd; transform: translateY(1px); }
+  .rowitem {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; overflow: hidden;
+    box-shadow: var(--shadow-sm); transition: opacity .15s;
+  }
   .rowitem.off { opacity: .55; }
-  .rowhead { display: flex; align-items: center; gap: 8px; padding: 9px 10px; cursor: pointer; }
+  .rowhead { display: flex; align-items: center; gap: 8px; padding: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .rowhead:active { background: #f8faff; }
   .rowhead .rowicon { width: 28px; height: 28px; object-fit: contain; border-radius: 5px; flex: none; }
   .rowhead .rname { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rowcats { font-size: 10px; font-weight: normal; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -114,27 +139,42 @@
   .rowtools { display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
   .rowtools input[type="text"] { flex: 1; min-width: 8em; }
   .rowtools select { font-size: 13px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
-  button.small { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
-  button.danger { background: #c0392b; }
+  button.small {
+    background: var(--grad); color: #fff; border: none; border-radius: 8px; padding: 6px 10px; font-size: 12px;
+    cursor: pointer; font-weight: 600; box-shadow: 0 1px 3px rgba(91, 110, 225, .3); transition: filter .15s, transform .1s;
+  }
+  button.small:active { transform: translateY(1px); filter: brightness(.95); }
+  button.danger { background: linear-gradient(135deg, #e0584a, #c0392b); box-shadow: 0 1px 3px rgba(192, 57, 43, .3); }
 
   /* 設定 */
-  .setcard { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-  .setcard h3 { margin: 0 0 8px; font-size: 13px; color: var(--sub); }
+  .setcard { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 13px; margin-bottom: 10px; box-shadow: var(--shadow-sm); }
+  .setcard h3 { margin: 0 0 8px; font-size: 13px; color: var(--sub); letter-spacing: .03em; }
   .colorbtns { display: flex; gap: 6px; }
   .colorbtns button {
-    flex: 1; padding: 10px 0; border-radius: 8px; border: 2px solid transparent; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; opacity: .45;
+    flex: 1; padding: 10px 0; border-radius: 10px; border: 2px solid transparent; color: #fff; font-size: 14px; font-weight: 700;
+    cursor: pointer; opacity: .4; transition: opacity .15s, box-shadow .15s, transform .1s;
   }
-  .colorbtns button.sel { opacity: 1; border-color: var(--text); }
+  .colorbtns button.sel { opacity: 1; border-color: #fff; box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(35, 45, 90, .18); }
+  .colorbtns button:active { transform: scale(.97); }
   .setline { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px; }
   .setline select, .setline input { font-size: 14px; padding: 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
   .setline input[type="number"] { width: 5.5em; text-align: right; }
 
   /* モーダル共通 */
-  .modal { position: fixed; inset: 0; background: rgba(20,25,40,.55); display: none; align-items: flex-start; justify-content: center; padding: 6vh 12px 12px; z-index: 100; }
+  .modal {
+    position: fixed; inset: 0; background: rgba(22,28,52,.5);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    display: none; align-items: flex-start; justify-content: center; padding: 6vh 12px 12px; z-index: 100;
+  }
   .modal.open { display: flex; }
+  @keyframes modalPop { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
   /* 検索・スキル・詳細はカード編集ウィンドウの上に重ねて表示する */
   #searchModal, #skillModal, #cardModal { z-index: 120; }
-  .sbox { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; max-height: 82vh; display: flex; flex-direction: column; padding: 14px; overflow-y: auto; }
+  .sbox {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 520px; max-height: 82vh;
+    display: flex; flex-direction: column; padding: 16px; overflow-y: auto;
+    box-shadow: 0 24px 70px -24px rgba(20, 30, 80, .5); animation: modalPop .18s ease;
+  }
   .sbox > input.search { width: 100%; font-size: 16px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; }
   #searchResults { overflow-y: auto; margin-top: 8px; }
   .sitem { display: flex; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
