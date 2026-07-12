@@ -480,7 +480,7 @@ function applySkillRows(slot, c) {
     if (s.o === "LS" && slot !== 0 && slot !== 5) continue;
     state.rows.push({
       name: s.k, on: true, auto: slot,
-      sk: { v: s.v, r: s.r || "", fv: s.fv, c: s.c },
+      sk: { v: s.v, r: s.r || "", fv: s.fv, c: s.c, pa: s.pa },
       info: { card: c.n, img: c.u || "", txt: s.t || "", fptxt: s.ft || "" },
       cells: [],
     });
@@ -496,6 +496,15 @@ function refreshAutoRows() {
     // フルパワーモードで、その行にフルパワー倍率(fv)があればそちらを使う
     const useVal = (state.skillMode === "fullpower" && info.fv != null) ? info.fv : info.v;
     row.cells = state.cards.map((cd, j) => {
+      // 指定属性被ダメアップ: カード単位でなく、主属性/副属性それぞれのダメージ属性で判定
+      // （例:「受ける紫、緑属性ダメージを6.5倍」→ 紫・緑のダメージのセルにだけ入る）
+      if (info.pa) {
+        const v = String(useVal);
+        return {
+          m: (info.r || "").includes(cd.main) ? v : "",
+          s: (cd.sub && cd.sub !== "なし" && (info.r || "").includes(cd.sub)) ? v : "",
+        };
+      }
       let hit;
       if (info.r === "自身のみ") hit = j === slot;
       else if (info.r === "隣接" || info.r === "隣接内") hit = Math.abs(j - slot) <= 1; // 自身と両隣

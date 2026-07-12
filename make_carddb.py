@@ -231,6 +231,7 @@ TEXT_RULES = [
     (r"全体攻撃に", "全体攻撃化"),
     (r"連続攻撃に", "連続攻撃化"),
     (r"爆裂攻撃に", "爆裂攻撃化"),
+    (r"受ける.{1,12}?属性ダメージ", "相手が受ける属性ダメージアップ"),
     (r"受けるダメージを", "相手が受けるダメージアップ"),
     (r"回復力を[\d.]+倍", "回復力アップ"),
     (r"復活", "復活"),
@@ -414,6 +415,15 @@ def main():
                                "隣接内同色": "隣接同色",   # 自身と、両隣のうち同色のカード
                                "隣接": "両隣のみ",         # 自身を含まない（シャイニールミナス等）
                                }.get(rng, rng)
+                    # 指定属性被ダメアップ（アリィ＆ラフィソル等）: 効果文から対象の色を取り、
+                    # 主属性/副属性それぞれのダメージ属性で判定する印(pa)を付ける
+                    pa = False
+                    if name_map == "指定属性被ダメアップ":
+                        m2 = re.search(r"受ける(.{1,12}?)属性ダメージ", text)
+                        cols = [c for c in "赤青緑黄紫" if m2 and c in m2.group(1)]
+                        if cols:
+                            rng = "".join(cols)
+                            pa = True
                     sk = e.setdefault("sk", [])
                     # 同名スキルの重複はノーマル/フルパワーの違い
                     # → 小さい方=通常(v)、大きい方=フルパワー(fv) として両方残す
@@ -430,6 +440,8 @@ def main():
                         se = {"v": v, "r": rng, "k": name_map, "t": text}
                         if kind == "LS":
                             se["o"] = "LS"  # リーダー/サポート配置時のみ有効
+                        if pa:
+                            se["pa"] = 1
                         cats = cat_ids(dai, syo, text)
                         if cats:
                             se["c"] = cats
@@ -528,6 +540,20 @@ def main():
                 cats = classify_text(entry.get(src_key, ""))
                 if cats:
                     entry[dst_key] = cats
+            # Wiki由来の指定属性被ダメアップ（受ける◯属性ダメージをn倍）: 効果文から拾う
+            # （汎用の「受けるダメージをn倍」の正規表現では拾えないため行が欠けていた）
+            m = re.search(r"受ける(.{1,12}?)属性ダメージを([\d.]+)倍", entry.get("ns", ""))
+            if m:
+                cols = [c for c in "赤青緑黄紫" if c in m.group(1)]
+                if cols and not any(s.get("k") == "指定属性被ダメアップ" for s in entry.get("sk", [])):
+                    se = {"v": float(m.group(2)), "r": "".join(cols), "k": "指定属性被ダメアップ",
+                          "t": entry.get("ns", ""), "pa": 1,
+                          "c": [CAT_ID["相手が受ける属性ダメージアップ"]]}
+                    mf = re.search(r"受ける.{1,12}?属性ダメージを([\d.]+)倍", entry.get("fp", ""))
+                    if mf and float(mf.group(1)) > se["v"]:
+                        se["fv"] = float(mf.group(1))
+                        se["ft"] = entry.get("fp", "")
+                    entry.setdefault("sk", []).append(se)
             # Wiki由来の隣接エンハ: 効果文から「自身を含むか」「同色限定か」を判定して範囲を揃える
             for s in entry.get("sk", []):
                 if s.get("k") == "攻撃エンハ(隣接)":

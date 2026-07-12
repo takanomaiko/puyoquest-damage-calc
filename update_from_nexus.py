@@ -174,6 +174,18 @@ def parse_skills(jpase, jplse, jpasfe=""):
         m = re.search(r"受けるダメージを([\d.]+)倍", jpase)
         if m and float(m.group(1)) > 1:
             sk.append({"v": float(m.group(1)), "r": "味方全体", "k": "被ダメアップ", "t": jpase})
+        # 指定属性被ダメアップ（受ける◯属性ダメージをn倍）: 対象の色を範囲に入れ、
+        # 主属性/副属性それぞれのダメージ属性で判定する印(pa)を付ける
+        m = re.search(r"受ける(.{1,12}?)属性ダメージを([\d.]+)倍", jpase)
+        if m and float(m.group(2)) > 1:
+            cols = [c for c in "赤青緑黄紫" if c in m.group(1)]
+            if cols:
+                se = {"v": float(m.group(2)), "r": "".join(cols), "k": "指定属性被ダメアップ", "t": jpase, "pa": 1}
+                mf = re.search(r"受ける.{1,12}?属性ダメージを([\d.]+)倍", jpasfe)
+                if mf and float(mf.group(1)) > se["v"]:
+                    se["fv"] = float(mf.group(1))
+                    se["ft"] = jpasfe
+                sk.append(se)
         # 「与えるダメージを〜最大n%アップ」型（回数条件など）は最大値で入れる
         m = re.search(r"与えるダメージを.*?最大([\d.]+)[%％]", jpase)
         if m and float(m.group(1)) > 0:
