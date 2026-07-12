@@ -987,7 +987,7 @@ function openCardModal(i) {
     ...saved,
     type: saved.type || db.t || "",
     ns: saved.ns || db.ns || "", ls: saved.ls || db.ls || "",
-    fp: saved.fp || db.fp || "", ts: saved.ts || db.ts || "",
+    fp: saved.fp || db.fp || "", wp: saved.wp || db.wp || "", ts: saved.ts || db.ts || "",
     ab: saved.ab || db.ab || "", ga: saved.ga || db.ga || "",
   };
   const hasSub = card.sub && card.sub !== "なし";
@@ -1008,6 +1008,7 @@ function openCardModal(i) {
   if ((i === 0 || i === 5) && card.ls) secs.push(["リーダースキル", card.ls, ""]);
   if (card.ns) secs.push(["スキル", card.ns, ""]);
   if (card.fp) secs.push(["フルパワー", card.fp, "sub"]);
+  if (card.wp) secs.push(["ダブルパワー", card.wp, "sub"]);
   if (card.ts) secs.push(["とくもり", card.ts, "sub"]);
   if (card.ab) secs.push(["アビリティ", card.ab, "sub"]);
   if (card.ga) secs.push(["きらめきオーラ", card.ga, "sub"]);
@@ -1118,7 +1119,7 @@ function pickCard(c) {
   if (c.h) card.hp = c.h;
   if (c.c) card.rcv = c.c;
   card.ns = c.ns || ""; card.ls = c.ls || "";
-  card.fp = c.fp || ""; card.ts = c.ts || "";
+  card.fp = c.fp || ""; card.wp = c.wp || ""; card.ts = c.ts || "";
   card.ab = c.ab || ""; card.ga = c.ga || "";
   card.ail = c.ail || [];
   applySkillRows(searchTarget, c);

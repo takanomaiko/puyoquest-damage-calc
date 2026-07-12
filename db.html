@@ -116,8 +116,8 @@ function filterCards() {
     if (ft && c.t !== ft) return false;
     if (fs === "wiki" && !c.w) return false;
     if (fs === "sheet" && c.w) return false;
-    // スキル分類: 通常スキル(sc)かフルパワー(fc)のどちらかに含まれていればヒット
-    if (fsk !== "" && !((c.sc || []).includes(+fsk) || (c.fc || []).includes(+fsk))) return false;
+    // スキル分類: 通常スキル(sc)/フルパワー(fc)/ダブルパワー(wc)のどれかに含まれていればヒット
+    if (fsk !== "" && !((c.sc || []).includes(+fsk) || (c.fc || []).includes(+fsk) || (c.wc || []).includes(+fsk))) return false;
     return true;
   });
 }
@@ -138,6 +138,8 @@ function detailHTML(c) {
     (c.sc ? `<div class="skcats">分類: ${catNames(c.sc)}</div>` : "") + `</div>`);
   if (c.fp) secs.push(`<div class="lbl sub">フルパワー</div><div>${c.fp}` +
     (c.fc ? `<div class="skcats">分類: ${catNames(c.fc)}</div>` : "") + `</div>`);
+  if (c.wp) secs.push(`<div class="lbl sub">ダブルパワー</div><div>${c.wp}` +
+    (c.wc ? `<div class="skcats">分類: ${catNames(c.wc)}</div>` : "") + `</div>`);
   if (c.ts) secs.push(`<div class="lbl sub">とくもり</div><div>${c.ts}</div>`);
   if (c.ab) secs.push(`<div class="lbl sub">アビリティ</div><div>${c.ab}</div>`);
   if (c.ga) secs.push(`<div class="lbl sub">きらめきオーラ</div><div>${c.ga}</div>`);

@@ -195,6 +195,10 @@ def classify_row(dai, syo, text):
     return []
 
 
+# ダブルパワースキルを持つカード（Wikiはフルパワー欄に載せているので付け替える対象）
+# 現状この2枚だけ（ユーザー確認済み2026-07-12）。新しいダブルパワー持ちが出たらここに追加
+WP_CARDS = {"サタン＆エコロ", "ドラコ＆リデル"}
+
 # Wiki由来カード（シートに分類がない）用: 効果文からの推測分類
 TEXT_RULES = [
     (r"だいれんさチャンス", "だいれんさチャンス発動"),
@@ -221,7 +225,6 @@ TEXT_RULES = [
     (r"全体攻撃に", "全体攻撃化"),
     (r"連続攻撃に", "連続攻撃化"),
     (r"爆裂攻撃に", "爆裂攻撃化"),
-    (r"与えるダメージを", "相手に与えるダメージアップ"),
     (r"受けるダメージを", "相手が受けるダメージアップ"),
     (r"回復力を[\d.]+倍", "回復力アップ"),
     (r"復活", "復活"),
@@ -236,6 +239,12 @@ def classify_text(text):
     for pat, cat in TEXT_RULES:
         if re.search(pat, text):
             ids.add(CAT_ID[cat])
+    # 与ダメアップ: 回数を重ねて増えるもの（ドラコ＆リデル等）は「累積で〜」
+    if "与えるダメージを" in text:
+        if "累積" in text or re.search(r"回数×", text):
+            ids.add(CAT_ID["累積で相手に与えるダメージアップ"])
+        else:
+            ids.add(CAT_ID["相手に与えるダメージアップ"])
     # 攻撃力n倍: 条件付き（同時消し/同時攻撃/連鎖）なら「条件達成で〜」
     if re.search(r"攻撃力[をが]?.{0,20}[\d.]+倍", text):
         if re.search(r"同時消し|同時攻撃|連鎖以上|以上の連鎖", text):
@@ -284,28 +293,34 @@ def main():
             "u": r[8].strip(),      # 画像URL
         })
         kind, text = r[16].strip(), r[29].strip()
-        # 列9「FP(+)」: 空=通常、(FP)=フルパワー、(DS)=モード発動などを含む現行スキルの行、
-        # (+)/SP/(WP)など=スキルプラス等の強化版。強化版の行はまるごと使わない
+        # 列9「FP(+)」: 空=通常、(FP)=フルパワー（発動ぷよ数35→50）、
+        # (WP)=ダブルパワー（発動が2色になる。サタン＆エコロなど）、
+        # (DS)=モード発動などを含む現行スキルの行、
+        # (+)/SPなど=スキルプラス等の強化版。強化版の行はまるごと使わない
         # （以前は2つ目の効果文をすべてフルパワーと誤認していた）
         variant = r[9].strip()
-        if variant not in ("", "(FP)", "(DS)"):
+        if variant not in ("", "(FP)", "(DS)", "(WP)"):
             continue
         is_fp = variant == "(FP)"
+        is_wp = variant == "(WP)"
         if kind == "NS" and text:
             if is_fp:
                 if "fp" not in e:
                     e["fp"] = text                 # (FP)行＝フルパワースキル
+            elif is_wp:
+                if "wp" not in e:
+                    e["wp"] = text                 # (WP)行＝ダブルパワースキル
             elif "ns" not in e:
                 e["ns"] = text                     # 通常行＝ノーマルスキル
-        if kind == "LS" and not is_fp and "ls" not in e and text:
+        if kind == "LS" and not is_fp and not is_wp and "ls" not in e and text:
             e["ls"] = text
-        if kind == "TS" and not is_fp and "ts" not in e and text:
+        if kind == "TS" and not is_fp and not is_wp and "ts" not in e and text:
             e["ts"] = text   # とくもりスキル（カード詳細表示用）
-        if kind == "AB" and not is_fp and "ab" not in e and text:
+        if kind == "AB" and not is_fp and not is_wp and "ab" not in e and text:
             e["ab"] = text   # アビリティ（カード詳細表示用）
 
         # リーダースキル倍率 [体力, 攻撃, 回復] とその範囲（列11-14）
-        if "lm" not in e and not is_fp:
+        if "lm" not in e and not is_fp and not is_wp:
             try:
                 lm = [round(float(r[11]), 3), round(float(r[12]), 3), round(float(r[13]), 3)]
                 if any(lm):
@@ -318,11 +333,15 @@ def main():
         # 「発動率50%」「攻撃ダウン80%」など倍率でないものは除外する
         dai, syo = r[17].strip(), r[18].strip()
 
-        # スキル分類（ゲーム内スキル検索と同じカテゴリ）: 通常スキル=sc、フルパワー=fc
+        # スキル分類（ゲーム内スキル検索と同じカテゴリ）:
+        # 通常スキル=sc、フルパワー=fc、ダブルパワー=wc
         if kind == "NS":
             cats = classify_row(dai, syo, text)
             if cats:
-                e.setdefault("_fc" if is_fp else "_sc", set()).update(CAT_ID[c] for c in cats)
+                key = "_fc" if is_fp else ("_wc" if is_wp else "_sc")
+                e.setdefault(key, set()).update(CAT_ID[c] for c in cats)
+        if is_wp:
+            continue  # ダブルパワー行は効果文と分類だけ使う（倍率などは通常行から）
         name_map = None
         if ("エンハ" in dai or "攻撃値up" in dai) and "回復" not in syo and "体力エンハ" not in syo:
             # エンハンス/条件付きエンハンス/攻撃値up（回復・体力エンハはダメージと無関係なので除外）
@@ -440,7 +459,7 @@ def main():
 
     # スキル分類の作業用セットを保存用の配列に変換する
     for e in entries.values():
-        for key in ("sc", "fc"):
+        for key in ("sc", "fc", "wc"):
             s = e.pop("_" + key, None)
             if s:
                 e[key] = sorted(s)
@@ -470,13 +489,20 @@ def main():
                 continue
             existing.add(key)
             entry = {k: v for k, v in card.items() if k != "code"}
+            # ダブルパワー持ちカード: Wikiではフルパワー欄に入っているので付け替える
+            # （フルパワー=発動ぷよ数35→50、ダブルパワー=発動が2色になる別システム）
+            if card["n"] in WP_CARDS and entry.get("fp"):
+                entry["wp"] = entry.pop("fp")
+                for s in entry.get("sk", []):
+                    if "fv" in s:
+                        s["wv"] = s.pop("fv")   # ダブルパワー倍率（計算機では未使用）
+                    if "ft" in s:
+                        s["wt"] = s.pop("ft")
             # Wiki由来はシートの分類がないので、効果文から推測して分類する
-            sc = classify_text(entry.get("ns", ""))
-            fc = classify_text(entry.get("fp", ""))
-            if sc:
-                entry["sc"] = sc
-            if fc:
-                entry["fc"] = fc
+            for src_key, dst_key in (("ns", "sc"), ("fp", "fc"), ("wp", "wc")):
+                cats = classify_text(entry.get(src_key, ""))
+                if cats:
+                    entry[dst_key] = cats
             entries[(card["n"] + "@nexus", card["r"])] = entry
             nexus_added += 1
         print(f"Wiki由来のカードを追加: {nexus_added}枚")
@@ -499,7 +525,7 @@ def main():
         w = csv.writer(f)
         w.writerow(["名称", "レア度", "タイプ", "主属性", "副属性", "攻撃", "体力", "回復",
                     "とっくん", "出典", "リダ攻倍率", "倍率スキル", "付与できる状態異常",
-                    "スキル", "スキル分類", "フルパワー分類",
+                    "スキル", "スキル分類", "フルパワー分類", "ダブルパワー分類",
                     "リーダースキル", "とくもり", "きらめきオーラ"])
         for e in cards:
             w.writerow([
@@ -514,6 +540,7 @@ def main():
                 e.get("ns", ""),
                 "; ".join(SKILL_CATS[i] for i in e.get("sc", [])),
                 "; ".join(SKILL_CATS[i] for i in e.get("fc", [])),
+                "; ".join(SKILL_CATS[i] for i in e.get("wc", [])),
                 e.get("ls", ""), e.get("ts", ""), e.get("ga", ""),
             ])
     print(f"CSV版も出力: {csv_out}")

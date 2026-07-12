@@ -542,6 +542,7 @@ function pickCard(c) {
   card.ns = c.ns || "";
   card.ls = c.ls || "";
   card.fp = c.fp || "";     // フルパワースキル
+  card.wp = c.wp || "";     // ダブルパワースキル（サタン＆エコロ等）
   card.ts = c.ts || "";     // とくもりスキル
   card.ab = c.ab || "";     // アビリティ
   card.ga = c.ga || "";     // きらめきオーラ
@@ -671,6 +672,7 @@ function openCardModal(i) {
     ns: saved.ns || db.ns || "",
     ls: saved.ls || db.ls || "",
     fp: saved.fp || db.fp || "",
+    wp: saved.wp || db.wp || "",
     ts: saved.ts || db.ts || "",
     ab: saved.ab || db.ab || "",
     ga: saved.ga || db.ga || "",
@@ -696,6 +698,7 @@ function openCardModal(i) {
   if ((i === 0 || i === 5) && card.ls) secs.push(["リーダースキル", card.ls, ""]);
   if (card.ns) secs.push(["スキル", card.ns, ""]);
   if (card.fp) secs.push(["フルパワー", card.fp, "sub"]);
+  if (card.wp) secs.push(["ダブルパワー", card.wp, "sub"]);
   if (card.ts) secs.push(["とくもり", card.ts, "sub"]);
   if (card.ab) secs.push(["アビリティ", card.ab, "sub"]);
   if (card.ga) secs.push(["きらめきオーラ", card.ga, "sub"]);
