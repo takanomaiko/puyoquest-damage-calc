@@ -125,8 +125,10 @@
   }
   .cm-label.sub { background: #8a93a8; }
   .cm-text { font-size: 13px; line-height: 1.8; }
+  .skcats { font-size: 11px; color: var(--sub); margin-top: 2px; }
   /* 倍率表: 名前の列は横スクロールしても固定、カードはアイコンで見分ける */
   #multTable .namecell { white-space: nowrap; text-align: left; }
+  .rowcats { font-size: 10px; color: var(--sub); margin-top: 2px; white-space: normal; max-width: 15em; }
   .rowicon { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; margin-right: 3px; border-radius: 4px; }
   #multTable thead tr:first-child th:first-child,
   #multTable tbody td:first-child { position: sticky; left: 0; z-index: 2; background: #fff; }
@@ -543,6 +545,7 @@ function pickCard(c) {
   card.ls = c.ls || "";
   card.fp = c.fp || "";     // フルパワースキル
   card.wp = c.wp || "";     // ダブルパワースキル（サタン＆エコロ等）
+  card.sc = c.sc; card.fc = c.fc; card.wc = c.wc;  // スキル分類（詳細表示用）
   card.ts = c.ts || "";     // とくもりスキル
   card.ab = c.ab || "";     // アビリティ
   card.ga = c.ga || "";     // きらめきオーラ
@@ -600,7 +603,7 @@ function applySkillRows(slot, c) {
       name: s.k,
       on: true,
       auto: slot,
-      sk: { v: s.v, r: s.r || "", fv: s.fv },
+      sk: { v: s.v, r: s.r || "", fv: s.fv, c: s.c },
       info: { card: c.n, img: c.u || "", txt: s.t || "", fptxt: s.ft || "" },
       cells: [],
     });
@@ -676,7 +679,13 @@ function openCardModal(i) {
     ts: saved.ts || db.ts || "",
     ab: saved.ab || db.ab || "",
     ga: saved.ga || db.ga || "",
+    sc: saved.sc || db.sc,   // スキル分類（ゲーム内スキル検索のカテゴリ）
+    fc: saved.fc || db.fc,
+    wc: saved.wc || db.wc,
   };
+  // 効果文の下に付ける分類の小さい表示
+  const catLine = (ids) => (ids && typeof SKILL_CATS !== "undefined")
+    ? `<div class="skcats">分類: ${ids.map((x) => SKILL_CATS[x]).join("、")}</div>` : "";
   const hasSub = card.sub && card.sub !== "なし";
   const role = i === 0 ? "リーダー" : i === 5 ? "サポート" : "";
   const head = $("#cardModalHead");
@@ -696,9 +705,9 @@ function openCardModal(i) {
   const secs = [];
   if (statLine) secs.push(["ステータス", statLine, "sub"]);
   if ((i === 0 || i === 5) && card.ls) secs.push(["リーダースキル", card.ls, ""]);
-  if (card.ns) secs.push(["スキル", card.ns, ""]);
-  if (card.fp) secs.push(["フルパワー", card.fp, "sub"]);
-  if (card.wp) secs.push(["ダブルパワー", card.wp, "sub"]);
+  if (card.ns) secs.push(["スキル", card.ns + catLine(card.sc), ""]);
+  if (card.fp) secs.push(["フルパワー", card.fp + catLine(card.fc), "sub"]);
+  if (card.wp) secs.push(["ダブルパワー", card.wp + catLine(card.wc), "sub"]);
   if (card.ts) secs.push(["とくもり", card.ts, "sub"]);
   if (card.ab) secs.push(["アビリティ", card.ab, "sub"]);
   if (card.ga) secs.push(["きらめきオーラ", card.ga, "sub"]);
@@ -1175,6 +1184,17 @@ function updateMultHeader() {
 }
 
 // 倍率行を名前順に並べ替える（同じ枠の効果＝重複できないものが隣に並ぶ）
+// 倍率行のゲーム内スキル分類名を返す（自動入力行のsk.c、状態異常行は行名から）
+function rowCatNames(row) {
+  if (typeof SKILL_CATS === "undefined") return [];
+  if (row.sk && row.sk.c) return row.sk.c.map((i) => SKILL_CATS[i]);
+  if (row.st) {
+    const m = row.name.match(/^状態異常:(.+)$/);
+    if (m && SKILL_CATS.includes(m[1])) return [m[1]];
+  }
+  return [];
+}
+
 // リーダースキルとサポートリーダーは常に一番上に固定
 let multSortAsc = true;
 function sortMultRows() {
@@ -1230,6 +1250,14 @@ function renderMultTable() {
         openSkillModal(title, useFP ? row.info.fptxt : row.info.txt);
       });
       tdName.appendChild(skillBtn);
+    }
+    // ゲーム内スキル検索の分類を行名の下に小さく表示
+    const cats = rowCatNames(row);
+    if (cats.length) {
+      const catDiv = document.createElement("div");
+      catDiv.className = "rowcats";
+      catDiv.textContent = cats.join("、");
+      tdName.appendChild(catDiv);
     }
 
     const tdAll = document.createElement("td");

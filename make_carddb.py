@@ -166,7 +166,7 @@ NO_CLASS_DAI = {"スキル砲強化", "スキルなし", "デメリット系", "
 unknown_combos = {}  # 対応表にない組み合わせの記録（実行時に警告表示）
 
 
-def classify_row(dai, syo, text):
+def classify_row(dai, syo, text, warn=True):
     """シートの大分類/小分類（＋効果文）をゲーム内スキル検索のカテゴリ名リストにする"""
     if (dai, syo) in PAIR_MAP:
         return PAIR_MAP[(dai, syo)]
@@ -190,9 +190,15 @@ def classify_row(dai, syo, text):
         return DAI_MAP[dai]
     if dai in NO_CLASS_DAI:
         return []
-    if dai or syo:
+    if warn and (dai or syo):
         unknown_combos[(dai, syo)] = unknown_combos.get((dai, syo), 0) + 1
     return []
+
+
+def cat_ids(dai, syo, text):
+    """倍率スキル(sk)エントリに付けるスキル分類ID（見つからなければNone）"""
+    cats = classify_row(dai, syo, text, warn=False)
+    return [CAT_ID[c] for c in cats] if cats else None
 
 
 # ダブルパワースキルを持つカード（Wikiはフルパワー欄に載せているので付け替える対象）
@@ -376,6 +382,9 @@ def main():
                 fe = {"v": fv, "r": fr, "k": fk, "t": text}
                 if kind == "LS":
                     fe["o"] = "LS"
+                cats = cat_ids(dai, syo, text)  # スキル分類ID（倍率行に表示）
+                if cats:
+                    fe["c"] = cats
                 sk.append(fe)
         if dai == "モード効果" and syo in MODE_MAP:
             mv, mr = MODE_MAP[syo]
@@ -384,6 +393,9 @@ def main():
                 me = {"v": mv, "r": mr, "k": syo, "t": text}
                 if kind == "LS":
                     me["o"] = "LS"
+                cats = cat_ids(dai, syo, text)
+                if cats:
+                    me["c"] = cats
                 sk.append(me)
 
         if name_map:
@@ -408,6 +420,9 @@ def main():
                         se = {"v": v, "r": r[19].strip(), "k": name_map, "t": text}
                         if kind == "LS":
                             se["o"] = "LS"  # リーダー/サポート配置時のみ有効
+                        cats = cat_ids(dai, syo, text)
+                        if cats:
+                            se["c"] = cats
                         sk.append(se)
             except ValueError:
                 pass
@@ -503,6 +518,15 @@ def main():
                 cats = classify_text(entry.get(src_key, ""))
                 if cats:
                     entry[dst_key] = cats
+            # Wiki由来の倍率スキルにも行の名前から分類IDを付ける
+            for s in entry.get("sk", []):
+                for pat, cat in (("攻撃エンハ", "攻撃力アップ"), ("同時攻撃", "条件達成で攻撃力アップ"),
+                                 ("属性を含む", "条件達成で攻撃力アップ"), ("連鎖以上", "条件達成で攻撃力アップ"),
+                                 ("与ダメ", "相手に与えるダメージアップ"), ("被ダメ", "相手が受けるダメージアップ"),
+                                 ("盾破壊", "属性盾弱体化")):
+                    if pat in s.get("k", ""):
+                        s["c"] = [CAT_ID[cat]]
+                        break
             entries[(card["n"] + "@nexus", card["r"])] = entry
             nexus_added += 1
         print(f"Wiki由来のカードを追加: {nexus_added}枚")

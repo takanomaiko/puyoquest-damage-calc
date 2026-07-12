@@ -98,6 +98,7 @@
   .rowhead { display: flex; align-items: center; gap: 8px; padding: 9px 10px; cursor: pointer; }
   .rowhead .rowicon { width: 28px; height: 28px; object-fit: contain; border-radius: 5px; flex: none; }
   .rowhead .rname { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rowcats { font-size: 10px; font-weight: normal; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rowhead .rval { font-size: 13px; color: var(--accent); font-weight: 700; flex: none; }
   .rowhead .arrow { color: var(--sub); flex: none; font-size: 12px; }
   .rswitch { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }
@@ -142,6 +143,7 @@
   .cm-label { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); padding: 2px 10px; border-radius: 10px; margin: 12px 0 4px; }
   .cm-label.sub { background: #8a93a8; }
   .cm-text { font-size: 13px; line-height: 1.8; }
+  .skcats { font-size: 11px; color: var(--sub); margin-top: 2px; }
   #cardModalHead { display: flex; gap: 12px; align-items: center; }
   #cardModalHead img { width: 68px; height: 68px; object-fit: contain; border-radius: 8px; flex: none; }
 
@@ -438,7 +440,7 @@ function applySkillRows(slot, c) {
     if (s.o === "LS" && slot !== 0 && slot !== 5) continue;
     state.rows.push({
       name: s.k, on: true, auto: slot,
-      sk: { v: s.v, r: s.r || "", fv: s.fv },
+      sk: { v: s.v, r: s.r || "", fv: s.fv, c: s.c },
       info: { card: c.n, img: c.u || "", txt: s.t || "", fptxt: s.ft || "" },
       cells: [],
     });
@@ -628,6 +630,18 @@ function renderGallery() {
 
 // 倍率リスト
 const openRows = new Set(); // 開いている行（見た目の状態）
+
+// 倍率行のゲーム内スキル分類名を返す（自動入力行のsk.c、状態異常行は行名から）
+function rowCatNames(row) {
+  if (typeof SKILL_CATS === "undefined") return [];
+  if (row.sk && row.sk.c) return row.sk.c.map((i) => SKILL_CATS[i]);
+  if (row.st) {
+    const m = row.name.match(/^状態異常:(.+)$/);
+    if (m && SKILL_CATS.includes(m[1])) return [m[1]];
+  }
+  return [];
+}
+
 function rowSummary(row) {
   const vals = [...new Set(row.cells.flatMap((c) => [c.m, c.s]).filter((v) => v !== ""))];
   if (vals.length === 0) return "—";
@@ -666,6 +680,14 @@ function renderRows() {
     const rname = document.createElement("div");
     rname.className = "rname";
     rname.textContent = row.name;
+    // ゲーム内スキル検索の分類を名前の下に小さく表示
+    const cats = rowCatNames(row);
+    if (cats.length) {
+      const catDiv = document.createElement("div");
+      catDiv.className = "rowcats";
+      catDiv.textContent = cats.join("、");
+      rname.appendChild(catDiv);
+    }
     head.appendChild(rname);
 
     if (row.info && row.info.txt) {
@@ -989,7 +1011,11 @@ function openCardModal(i) {
     ns: saved.ns || db.ns || "", ls: saved.ls || db.ls || "",
     fp: saved.fp || db.fp || "", wp: saved.wp || db.wp || "", ts: saved.ts || db.ts || "",
     ab: saved.ab || db.ab || "", ga: saved.ga || db.ga || "",
+    sc: saved.sc || db.sc, fc: saved.fc || db.fc, wc: saved.wc || db.wc,  // スキル分類
   };
+  // 効果文の下に付ける分類の小さい表示
+  const catLine = (ids) => (ids && typeof SKILL_CATS !== "undefined")
+    ? `<div class="skcats">分類: ${ids.map((x) => SKILL_CATS[x]).join("、")}</div>` : "";
   const hasSub = card.sub && card.sub !== "なし";
   const role = i === 0 ? "リーダー" : i === 5 ? "サポート" : "";
   $("#cardModalHead").innerHTML =
@@ -1006,9 +1032,9 @@ function openCardModal(i) {
   const secs = [];
   if (statLine) secs.push(["ステータス", statLine, "sub"]);
   if ((i === 0 || i === 5) && card.ls) secs.push(["リーダースキル", card.ls, ""]);
-  if (card.ns) secs.push(["スキル", card.ns, ""]);
-  if (card.fp) secs.push(["フルパワー", card.fp, "sub"]);
-  if (card.wp) secs.push(["ダブルパワー", card.wp, "sub"]);
+  if (card.ns) secs.push(["スキル", card.ns + catLine(card.sc), ""]);
+  if (card.fp) secs.push(["フルパワー", card.fp + catLine(card.fc), "sub"]);
+  if (card.wp) secs.push(["ダブルパワー", card.wp + catLine(card.wc), "sub"]);
   if (card.ts) secs.push(["とくもり", card.ts, "sub"]);
   if (card.ab) secs.push(["アビリティ", card.ab, "sub"]);
   if (card.ga) secs.push(["きらめきオーラ", card.ga, "sub"]);
@@ -1120,6 +1146,7 @@ function pickCard(c) {
   if (c.c) card.rcv = c.c;
   card.ns = c.ns || ""; card.ls = c.ls || "";
   card.fp = c.fp || ""; card.wp = c.wp || ""; card.ts = c.ts || "";
+  card.sc = c.sc; card.fc = c.fc; card.wc = c.wc;  // スキル分類（詳細表示用）
   card.ab = c.ab || ""; card.ga = c.ga || "";
   card.ail = c.ail || [];
   applySkillRows(searchTarget, c);
