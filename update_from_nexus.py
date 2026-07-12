@@ -165,6 +165,8 @@ def parse_skills(jpase, jplse, jpasfe=""):
             else:
                 r = color_range(jpase)
             entry = {"v": min(vals), "r": r, "k": k, "t": jpase}
+            if k == "攻撃値up&副属性等倍化":
+                entry["s3"] = 1  # 副属性等倍化＝副属性セルに3倍の値を入れる印
             # フルパワースキル(jpasfe)の攻撃倍率が高ければ fv として保持
             fvals = _atk_mults(jpasfe)
             if fvals and max(fvals) > entry["v"]:

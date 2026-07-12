@@ -415,6 +415,9 @@ def main():
                                "隣接内同色": "隣接同色",   # 自身と、両隣のうち同色のカード
                                "隣接": "両隣のみ",         # 自身を含まない（シャイニールミナス等）
                                }.get(rng, rng)
+                    # 攻撃値up&副属性等倍化（サタン＆エコロ）: 副属性係数が固定1/3のため、
+                    # 等倍化は副属性セルに3倍の値を入れて表現する印(s3)を付ける
+                    s3 = name_map == "攻撃値up&副属性等倍化"
                     # 指定属性被ダメアップ（アリィ＆ラフィソル等）: 効果文から対象の色を取り、
                     # 主属性/副属性それぞれのダメージ属性で判定する印(pa)を付ける
                     pa = False
@@ -442,6 +445,8 @@ def main():
                             se["o"] = "LS"  # リーダー/サポート配置時のみ有効
                         if pa:
                             se["pa"] = 1
+                        if s3:
+                            se["s3"] = 1
                         cats = cat_ids(dai, syo, text)
                         if cats:
                             se["c"] = cats
@@ -554,6 +559,10 @@ def main():
                         se["fv"] = float(mf.group(1))
                         se["ft"] = entry.get("fp", "")
                     entry.setdefault("sk", []).append(se)
+            # Wiki由来の攻撃値up&副属性等倍化: 副属性セル3倍の印を付ける
+            for s in entry.get("sk", []):
+                if s.get("k") == "攻撃値up&副属性等倍化":
+                    s["s3"] = 1
             # Wiki由来の隣接エンハ: 効果文から「自身を含むか」「同色限定か」を判定して範囲を揃える
             for s in entry.get("sk", []):
                 if s.get("k") == "攻撃エンハ(隣接)":

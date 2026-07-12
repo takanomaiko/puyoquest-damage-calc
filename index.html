@@ -641,7 +641,7 @@ function applySkillRows(slot, c) {
       name: s.k,
       on: true,
       auto: slot,
-      sk: { v: s.v, r: s.r || "", fv: s.fv, c: s.c, pa: s.pa },
+      sk: { v: s.v, r: s.r || "", fv: s.fv, c: s.c, pa: s.pa, s3: s.s3 },
       info: { card: c.n, img: c.u || "", txt: s.t || "", fptxt: s.ft || "" },
       cells: [],
     });
@@ -783,6 +783,8 @@ function refreshAutoRows() {
         hit = j === slot || (Math.abs(j - slot) === 1 && skillRangeMatches("同色", srcColor, cd)); // 自身と両隣の同色
       else hit = skillRangeMatches(info.r, srcColor, cd);
       const v = hit ? String(useVal) : "";
+      // 攻撃値up&副属性等倍化: 副属性係数が固定1/3のため、副属性セルは3倍の値で等倍を表現
+      if (info.s3) return { m: v, s: hit ? String(Math.round(useVal * 3 * 1000) / 1000) : "" };
       return { m: v, s: v };
     });
   }
