@@ -86,6 +86,11 @@
   th.statActive, td.statActive { background: #e3ecff; }
   #colorConfigTable input[type="number"] { width: 5em; text-align: right; }
   .deck-row td.statActive input { background: #eef3ff; font-weight: 700; }
+  #bkText {
+    width: 100%; height: 5em; font-size: 11px; color: var(--sub);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px; resize: vertical;
+    font-family: inherit; background: #fafbfe;
+  }
   .settings { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 13px; }
   .settings label { display: flex; align-items: center; gap: 5px; }
   footer { text-align: center; padding: 10px 0 30px; }
@@ -309,6 +314,13 @@
       </table>
     </div>
     <div id="resultTotals"></div>
+  </section>
+
+  <section>
+    <h2>バックアップ（機種変更・引っ越し・消えたときの保険）</h2>
+    <p class="hint">デッキ・倍率・図鑑の修正データを文字列にして保管できます（カードに設定したイラスト画像は含まれません）。メモアプリなどに貼っておけば、スマホ⇔PCの引っ越しにも使えます。</p>
+    <p><button id="bkExport">📤 書き出し（コピー）</button> <button id="bkImport">📥 読み込み</button></p>
+    <textarea id="bkText" placeholder="「書き出し」を押すとここにデータが出て、コピーされます。復元するときは、保管した文字列をここに貼り付けて「読み込み」を押します。"></textarea>
   </section>
 
   <footer>
@@ -1444,6 +1456,40 @@ $("#resetBtn").addEventListener("click", () => {
   state = sampleState();
   saveState();
   renderAll();
+});
+
+// ---------- バックアップ（コピペ方式） ----------
+// デッキ・倍率・図鑑の修正データを1つの文字列にまとめる（手持ち画像は大きいので除外）
+function makeBackupText() {
+  const st = JSON.parse(JSON.stringify(state));
+  st.cards.forEach((c) => { if (c.img && c.img.startsWith("data:")) c.img = ""; });
+  let ov = {};
+  try { ov = JSON.parse(localStorage.getItem("puyoquest_db_overrides")) || {}; } catch (e) {}
+  return JSON.stringify({ puyoquest_backup: 1, state: st, ov });
+}
+$("#bkExport").addEventListener("click", () => {
+  const t = makeBackupText();
+  $("#bkText").value = t;
+  $("#bkText").select();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t)
+      .then(() => alert("コピーしました！メモアプリなどに貼り付けて保管してください"))
+      .catch(() => alert("下の欄の文字列を全選択してコピーしてください"));
+  } else {
+    alert("下の欄の文字列を全選択してコピーしてください");
+  }
+});
+$("#bkImport").addEventListener("click", () => {
+  try {
+    const data = JSON.parse($("#bkText").value.trim());
+    if (!data.puyoquest_backup || !data.state) throw new Error("形式が違う");
+    if (!confirm("今のデッキ・修正データを、貼り付けた内容で置き換えます。よろしいですか？")) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data.state));
+    if (data.ov) localStorage.setItem("puyoquest_db_overrides", JSON.stringify(data.ov));
+    location.reload();
+  } catch (e) {
+    alert("読み込めませんでした。「書き出し」でコピーした文字列を、欠けないように全部貼り付けてください");
+  }
 });
 
 function renderAll() {
