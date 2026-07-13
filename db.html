@@ -54,6 +54,11 @@
   .lbl.sub { background: #8a93a8; }
   .skrow { font-size: 12px; margin: 2px 0; }
   .skcats { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .editrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .editrow input { width: 5.5em; font-size: 13px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px; text-align: right; }
+  .editrow button { font-size: 12px; padding: 5px 10px; border: none; border-radius: 8px; background: var(--grad); color: #fff; font-weight: 600; cursor: pointer; }
+  .editrow .ereset { background: #8a93a8; }
+  .edithint { font-size: 11px; color: var(--sub); margin-top: 3px; }
   #moreBtn {
     display: block; width: 100%; padding: 12px; margin: 8px 0 20px; background: var(--grad); color: #fff;
     border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
@@ -107,6 +112,26 @@
 const $ = (s) => document.querySelector(s);
 const COLOR_NUM = { 1: "赤", 2: "青", 3: "緑", 4: "黄", 5: "紫" };
 const badge = (c) => c ? `<span class="badge c${c}">${c}</span>` : "";
+
+// ---------- 自分で修正したステータス（攻撃・体力・回復） ----------
+// このブラウザにだけ保存され、計算機の検索でも修正後の値が使われる
+const DB_OV_KEY = "puyoquest_db_overrides";
+function loadDbOv() {
+  try { return JSON.parse(localStorage.getItem(DB_OV_KEY)) || {}; } catch (e) { return {}; }
+}
+function applyDbOv() {
+  const ov = loadDbOv();
+  for (const c of CARD_DB) {
+    const o = ov[c.n + "|" + c.r];
+    if (!o) continue;
+    if (o.a != null) c.a = o.a;
+    if (o.h != null) c.h = o.h;
+    if (o.c != null) c.c = o.c;
+    delete c.x;  // 自分で入れた値なので「とっくんなし」表示は消す
+    c.edited = 1;
+  }
+}
+applyDbOv();
 
 $("#total").textContent = CARD_DB.length.toLocaleString("ja-JP");
 
@@ -164,7 +189,44 @@ function detailHTML(c) {
   if (c.ts) secs.push(`<div class="lbl sub">とくもり</div><div>${c.ts}</div>`);
   if (c.ab) secs.push(`<div class="lbl sub">アビリティ</div><div>${c.ab}</div>`);
   if (c.ga) secs.push(`<div class="lbl sub">きらめきオーラ</div><div>${c.ga}</div>`);
+  // ステータス修正フォーム（保存はこのブラウザ内だけ・計算機の検索にも反映）
+  secs.push(
+    `<div class="lbl sub">ステータス修正 ✏️</div>` +
+    `<div class="editrow">` +
+    `攻撃 <input type="number" class="ea" value="${c.a ?? ""}"> ` +
+    `体力 <input type="number" class="eh" value="${c.h ?? ""}"> ` +
+    `回復 <input type="number" class="ec" value="${c.c ?? ""}"> ` +
+    `<button class="esave">保存</button>` +
+    (c.edited ? ` <button class="ereset">元の値に戻す</button>` : "") +
+    `</div>` +
+    `<div class="edithint">このブラウザにだけ保存され、計算機の検索でも修正後の値が使われます。</div>`);
   return secs.join("") || "詳細データなし";
+}
+
+// 修正フォームの保存・リセットのボタンを動かす
+function wireEdit(item, c) {
+  const box = item.querySelector(".ibody");
+  box.querySelector(".esave").addEventListener("click", () => {
+    const num = (cls) => { const v = box.querySelector(cls).value; return v === "" ? null : +v; };
+    const o = { a: num(".ea"), h: num(".eh"), c: num(".ec") };
+    const ov = loadDbOv();
+    ov[c.n + "|" + c.r] = o;
+    localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
+    if (o.a != null) c.a = o.a;
+    if (o.h != null) c.h = o.h;
+    if (o.c != null) c.c = o.c;
+    delete c.x;
+    c.edited = 1;
+    refresh();  // 一覧の表示を新しい値に更新
+  });
+  const resetBtn = box.querySelector(".ereset");
+  if (resetBtn) resetBtn.addEventListener("click", () => {
+    if (!confirm(`「${c.n}」の修正を消して元の値に戻します。よろしいですか？`)) return;
+    const ov = loadDbOv();
+    delete ov[c.n + "|" + c.r];
+    localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
+    location.reload();  // 元の値はDBから読み直す
+  });
 }
 
 function renderMore() {
@@ -173,7 +235,7 @@ function renderMore() {
   slice.forEach((c) => {
     const item = document.createElement("div");
     item.className = "item";
-    const atk = c.a ? `${c.a.toLocaleString("ja-JP")}<small>${c.x ? "とっくんなし" : "とっくん込み"}</small>` : "";
+    const atk = c.a ? `${c.a.toLocaleString("ja-JP")}<small>${c.edited ? "✏️自分で修正" : c.x ? "とっくんなし" : "とっくん込み"}</small>` : "";
     item.innerHTML =
       `<div class="ihead">` +
       (c.u ? `<img src="${c.u}" loading="lazy" alt="">` : "") +
@@ -182,7 +244,10 @@ function renderMore() {
       `<div class="iatk">${atk}</div></div>` +
       `<div class="ibody"></div>`;
     item.querySelector(".ihead").addEventListener("click", () => {
-      if (!item.classList.contains("open")) item.querySelector(".ibody").innerHTML = detailHTML(c);
+      if (!item.classList.contains("open")) {
+        item.querySelector(".ibody").innerHTML = detailHTML(c);
+        wireEdit(item, c);
+      }
       item.classList.toggle("open");
     });
     list.appendChild(item);

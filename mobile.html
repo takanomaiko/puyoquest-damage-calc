@@ -341,6 +341,22 @@ const STORAGE_KEY = "puyoquest-damage-calc-v1";
 const COLOR_NUM = { 1: "赤", 2: "青", 3: "緑", 4: "黄", 5: "紫" };
 const hasDB = typeof CARD_DB !== "undefined";
 
+// 図鑑で自分が修正したステータス（攻撃・体力・回復）をカードDBに反映する
+if (hasDB) {
+  try {
+    const dbOv = JSON.parse(localStorage.getItem("puyoquest_db_overrides")) || {};
+    for (const c of CARD_DB) {
+      const o = dbOv[c.n + "|" + c.r];
+      if (!o) continue;
+      if (o.a != null) c.a = o.a;
+      if (o.h != null) c.h = o.h;
+      if (o.c != null) c.c = o.c;
+      delete c.x;  // 自分で入れた値なので「とっくんなし」表示は消す
+      c.edited = 1;
+    }
+  } catch (e) { /* 壊れた保存データは無視 */ }
+}
+
 // タワーボーナス・応援デッキは色ごとの設定
 // （タワーボーナスの初期値は3倍（MAX）。最大値も3倍で頭打ちにする）
 function defaultColorConfig() {
