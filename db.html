@@ -59,6 +59,16 @@
   .editrow button { font-size: 12px; padding: 5px 10px; border: none; border-radius: 8px; background: var(--grad); color: #fff; font-weight: 600; cursor: pointer; }
   .editrow .ereset { background: #8a93a8; }
   .edithint { font-size: 11px; color: var(--sub); margin-top: 3px; }
+  .cedit { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 5px 0; }
+  .celabel { font-size: 11px; font-weight: 700; color: var(--sub); min-width: 5em; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #eef1fb; border: 1px solid var(--border); border-radius: 999px;
+    padding: 2px 9px; font-size: 11px;
+  }
+  .chip .chipx { cursor: pointer; color: #c0392b; font-size: 13px; }
+  .cedit .catsel { font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 7px; max-width: 11em; }
+  .cedit .catadd { font-size: 11px; padding: 4px 9px; border: none; border-radius: 7px; background: var(--grad); color: #fff; font-weight: 600; cursor: pointer; }
   #moreBtn {
     display: block; width: 100%; padding: 12px; margin: 8px 0 20px; background: var(--grad); color: #fff;
     border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
@@ -124,11 +134,17 @@ function applyDbOv() {
   for (const c of CARD_DB) {
     const o = ov[c.n + "|" + c.r];
     if (!o) continue;
-    if (o.a != null) c.a = o.a;
-    if (o.h != null) c.h = o.h;
-    if (o.c != null) c.c = o.c;
-    delete c.x;  // 自分で入れた値なので「とっくんなし」表示は消す
-    c.edited = 1;
+    c.ov = 1;  // 何かしら修正あり（「元に戻す」ボタン表示用）
+    if (o.a != null || o.h != null || o.c != null) {
+      if (o.a != null) c.a = o.a;
+      if (o.h != null) c.h = o.h;
+      if (o.c != null) c.c = o.c;
+      delete c.x;  // 自分で入れた値なので「とっくんなし」表示は消す
+      c.edited = 1;  // 一覧の「✏️自分で修正」表示用（ステータスのみ）
+    }
+    if (o.sc) c.sc = o.sc;  // スキル分類の付け替え
+    if (o.fc) c.fc = o.fc;
+    if (o.wc) c.wc = o.wc;
   }
 }
 applyDbOv();
@@ -136,12 +152,16 @@ applyDbOv();
 $("#total").textContent = CARD_DB.length.toLocaleString("ja-JP");
 
 // スキル分類のプルダウンを組み立てる（ゲーム内スキル検索と同じグループ・並び順）
-SKILL_CAT_GROUPS.forEach(([group, ids]) => {
-  const og = document.createElement("optgroup");
-  og.label = group;
-  ids.forEach((i) => og.appendChild(new Option(SKILL_CATS[i], i)));
-  $("#fSkill").appendChild(og);
-});
+// 絞り込み用と、分類修正フォームの「追加」用の両方で使う
+function fillCatSelect(sel) {
+  SKILL_CAT_GROUPS.forEach(([group, ids]) => {
+    const og = document.createElement("optgroup");
+    og.label = group;
+    ids.forEach((i) => og.appendChild(new Option(SKILL_CATS[i], i)));
+    sel.appendChild(og);
+  });
+}
+fillCatSelect($("#fSkill"));
 const catNames = (ids) => (ids || []).map((i) => SKILL_CATS[i]).join("、");
 
 let shown = 0;
@@ -181,11 +201,11 @@ function detailHTML(c) {
   if (c.lm) secs.push(`<div class="lbl">リーダースキル倍率</div><div class="skrow">攻撃×${c.lm[1]}（${c.lr || "味方全体"}）</div>`);
   if (c.ls) secs.push(`<div class="lbl sub">リーダースキル</div><div>${c.ls}</div>`);
   if (c.ns) secs.push(`<div class="lbl sub">スキル</div><div>${c.ns}` +
-    (c.sc ? `<div class="skcats">分類: ${catNames(c.sc)}</div>` : "") + `</div>`);
+    (c.sc && c.sc.length ? `<div class="skcats">分類: ${catNames(c.sc)}</div>` : "") + `</div>`);
   if (c.fp) secs.push(`<div class="lbl sub">フルパワー</div><div>${c.fp}` +
-    (c.fc ? `<div class="skcats">分類: ${catNames(c.fc)}</div>` : "") + `</div>`);
+    (c.fc && c.fc.length ? `<div class="skcats">分類: ${catNames(c.fc)}</div>` : "") + `</div>`);
   if (c.wp) secs.push(`<div class="lbl sub">ダブルパワー</div><div>${c.wp}` +
-    (c.wc ? `<div class="skcats">分類: ${catNames(c.wc)}</div>` : "") + `</div>`);
+    (c.wc && c.wc.length ? `<div class="skcats">分類: ${catNames(c.wc)}</div>` : "") + `</div>`);
   if (c.ts) secs.push(`<div class="lbl sub">とくもり</div><div>${c.ts}</div>`);
   if (c.ab) secs.push(`<div class="lbl sub">アビリティ</div><div>${c.ab}</div>`);
   if (c.ga) secs.push(`<div class="lbl sub">きらめきオーラ</div><div>${c.ga}</div>`);
@@ -197,9 +217,24 @@ function detailHTML(c) {
     `体力 <input type="number" class="eh" value="${c.h ?? ""}"> ` +
     `回復 <input type="number" class="ec" value="${c.c ?? ""}"> ` +
     `<button class="esave">保存</button>` +
-    (c.edited ? ` <button class="ereset">元の値に戻す</button>` : "") +
+    (c.ov ? ` <button class="ereset">修正を元に戻す</button>` : "") +
     `</div>` +
     `<div class="edithint">このブラウザにだけ保存され、計算機の検索でも修正後の値が使われます。</div>`);
+  // スキル分類の修正フォーム（×で外す・プルダウンで追加、変更は即保存）
+  const catEd = (key, label) =>
+    `<div class="cedit" data-key="${key}"><span class="celabel">${label}</span>` +
+    (c[key] || []).map((i) =>
+      `<span class="chip">${SKILL_CATS[i]}<b class="chipx" data-id="${i}">×</b></span>`).join("") +
+    `<select class="catsel"><option value="">分類を選ぶ…</option></select>` +
+    `<button class="catadd">追加</button></div>`;
+  let catSecs = "";
+  if (c.ns) catSecs += catEd("sc", "スキル");
+  if (c.fp) catSecs += catEd("fc", "フルパワー");
+  if (c.wp) catSecs += catEd("wc", "ダブルパワー");
+  if (catSecs) {
+    secs.push(`<div class="lbl sub">スキル分類の修正 ✏️</div>` + catSecs +
+      `<div class="edithint">×で外す・プルダウンから選んで追加。変更はすぐ保存されます。</div>`);
+  }
   return secs.join("") || "詳細データなし";
 }
 
@@ -221,11 +256,39 @@ function wireEdit(item, c) {
   });
   const resetBtn = box.querySelector(".ereset");
   if (resetBtn) resetBtn.addEventListener("click", () => {
-    if (!confirm(`「${c.n}」の修正を消して元の値に戻します。よろしいですか？`)) return;
+    if (!confirm(`「${c.n}」の修正（ステータス・スキル分類）を消して元に戻します。よろしいですか？`)) return;
     const ov = loadDbOv();
     delete ov[c.n + "|" + c.r];
     localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
     location.reload();  // 元の値はDBから読み直す
+  });
+  // スキル分類の修正（追加・削除は即保存して表示を更新）
+  box.querySelectorAll(".cedit").forEach((ed) => {
+    const key = ed.dataset.key;
+    const sel = ed.querySelector(".catsel");
+    fillCatSelect(sel);
+    const saveCats = () => {
+      const ov = loadDbOv();
+      const o = ov[c.n + "|" + c.r] || {};
+      o[key] = c[key] || [];
+      ov[c.n + "|" + c.r] = o;
+      localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
+      c.ov = 1;
+      box.innerHTML = detailHTML(c);  // 分類表示とチップを描き直す
+      wireEdit(item, c);
+    };
+    ed.querySelector(".catadd").addEventListener("click", () => {
+      if (sel.value === "") return;
+      const ids = c[key] || [];
+      if (!ids.includes(+sel.value)) {
+        c[key] = [...ids, +sel.value].sort((a, b) => a - b);
+        saveCats();
+      }
+    });
+    ed.querySelectorAll(".chipx").forEach((x) => x.addEventListener("click", () => {
+      c[key] = (c[key] || []).filter((i) => i !== +x.dataset.id);
+      saveCats();
+    }));
   });
 }
 

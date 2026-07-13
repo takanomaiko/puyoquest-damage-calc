@@ -526,7 +526,10 @@ if (hasDB) {
       if (o.a != null) c.a = o.a;
       if (o.h != null) c.h = o.h;
       if (o.c != null) c.c = o.c;
-      delete c.x;  // 自分で入れた値なので「とっくんなし」表示は消す
+      if (o.a != null || o.h != null || o.c != null) delete c.x;  // 「とっくんなし」表示は消す
+      if (o.sc) c.sc = o.sc;  // スキル分類の付け替え
+      if (o.fc) c.fc = o.fc;
+      if (o.wc) c.wc = o.wc;
       c.edited = 1;
     }
   } catch (e) { /* 壊れた保存データは無視 */ }
@@ -738,7 +741,7 @@ function openCardModal(i) {
     wc: saved.wc || db.wc,
   };
   // 効果文の下に付ける分類の小さい表示
-  const catLine = (ids) => (ids && typeof SKILL_CATS !== "undefined")
+  const catLine = (ids) => (ids && ids.length && typeof SKILL_CATS !== "undefined")
     ? `<div class="skcats">分類: ${ids.map((x) => SKILL_CATS[x]).join("、")}</div>` : "";
   const hasSub = card.sub && card.sub !== "なし";
   const role = i === 0 ? "リーダー" : i === 5 ? "サポート" : "";
