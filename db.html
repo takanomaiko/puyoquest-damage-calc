@@ -57,7 +57,7 @@
   .editrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
   .editrow input { width: 5.5em; font-size: 13px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px; text-align: right; }
   .editrow button { font-size: 12px; padding: 5px 10px; border: none; border-radius: 8px; background: var(--grad); color: #fff; font-weight: 600; cursor: pointer; }
-  .editrow .ereset { background: #8a93a8; }
+  .editrow .ereset, .editrow .creset { background: #8a93a8; }
   .edithint { font-size: 11px; color: var(--sub); margin-top: 3px; }
   .cedit { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 5px 0; }
   .celabel { font-size: 11px; font-weight: 700; color: var(--sub); min-width: 5em; }
@@ -134,14 +134,14 @@ function applyDbOv() {
   for (const c of CARD_DB) {
     const o = ov[c.n + "|" + c.r];
     if (!o) continue;
-    c.ov = 1;  // 何かしら修正あり（「元に戻す」ボタン表示用）
     if (o.a != null || o.h != null || o.c != null) {
       if (o.a != null) c.a = o.a;
       if (o.h != null) c.h = o.h;
       if (o.c != null) c.c = o.c;
       delete c.x;  // 自分で入れた値なので「とっくんなし」表示は消す
-      c.edited = 1;  // 一覧の「✏️自分で修正」表示用（ステータスのみ）
+      c.edited = 1;  // ステータス修正あり（一覧の✏️表示・戻すボタン用）
     }
+    if (o.sc || o.fc || o.wc) c.cedit = 1;  // 分類修正あり（戻すボタン用）
     if (o.sc) c.sc = o.sc;  // スキル分類の付け替え
     if (o.fc) c.fc = o.fc;
     if (o.wc) c.wc = o.wc;
@@ -217,7 +217,7 @@ function detailHTML(c) {
     `体力 <input type="number" class="eh" value="${c.h ?? ""}"> ` +
     `回復 <input type="number" class="ec" value="${c.c ?? ""}"> ` +
     `<button class="esave">保存</button>` +
-    (c.ov ? ` <button class="ereset">修正を元に戻す</button>` : "") +
+    (c.edited ? ` <button class="ereset">ステータスを元に戻す</button>` : "") +
     `</div>` +
     `<div class="edithint">このブラウザにだけ保存され、計算機の検索でも修正後の値が使われます。</div>`);
   // スキル分類の修正フォーム（×で外す・プルダウンで追加、変更は即保存）
@@ -233,6 +233,7 @@ function detailHTML(c) {
   if (c.wp) catSecs += catEd("wc", "ダブルパワー");
   if (catSecs) {
     secs.push(`<div class="lbl sub">スキル分類の修正 ✏️</div>` + catSecs +
+      (c.cedit ? `<div class="editrow"><button class="creset">分類を元に戻す</button></div>` : "") +
       `<div class="edithint">×で外す・プルダウンから選んで追加。変更はすぐ保存されます。</div>`);
   }
   return secs.join("") || "詳細データなし";
@@ -241,12 +242,20 @@ function detailHTML(c) {
 // 修正フォームの保存・リセットのボタンを動かす
 function wireEdit(item, c) {
   const box = item.querySelector(".ibody");
+  const ovKey = c.n + "|" + c.r;
+  // 修正データの中身が空になったらエントリごと消す共通処理
+  const saveOv = (ov, o) => {
+    const hasStats = o.a != null || o.h != null || o.c != null;
+    const hasCats = o.sc || o.fc || o.wc;
+    if (hasStats || hasCats) ov[ovKey] = o; else delete ov[ovKey];
+    localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
+  };
   box.querySelector(".esave").addEventListener("click", () => {
     const num = (cls) => { const v = box.querySelector(cls).value; return v === "" ? null : +v; };
-    const o = { a: num(".ea"), h: num(".eh"), c: num(".ec") };
     const ov = loadDbOv();
-    ov[c.n + "|" + c.r] = o;
-    localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
+    // 分類の修正を消さないように、既存の修正データに重ねる
+    const o = Object.assign(ov[ovKey] || {}, { a: num(".ea"), h: num(".eh"), c: num(".ec") });
+    saveOv(ov, o);
     if (o.a != null) c.a = o.a;
     if (o.h != null) c.h = o.h;
     if (o.c != null) c.c = o.c;
@@ -256,11 +265,21 @@ function wireEdit(item, c) {
   });
   const resetBtn = box.querySelector(".ereset");
   if (resetBtn) resetBtn.addEventListener("click", () => {
-    if (!confirm(`「${c.n}」の修正（ステータス・スキル分類）を消して元に戻します。よろしいですか？`)) return;
+    if (!confirm(`「${c.n}」のステータス修正を消して元の値に戻します。よろしいですか？`)) return;
     const ov = loadDbOv();
-    delete ov[c.n + "|" + c.r];
-    localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
+    const o = ov[ovKey] || {};
+    delete o.a; delete o.h; delete o.c;  // 分類の修正は残す
+    saveOv(ov, o);
     location.reload();  // 元の値はDBから読み直す
+  });
+  const cresetBtn = box.querySelector(".creset");
+  if (cresetBtn) cresetBtn.addEventListener("click", () => {
+    if (!confirm(`「${c.n}」のスキル分類の修正を消して元に戻します。よろしいですか？`)) return;
+    const ov = loadDbOv();
+    const o = ov[ovKey] || {};
+    delete o.sc; delete o.fc; delete o.wc;  // ステータスの修正は残す
+    saveOv(ov, o);
+    location.reload();
   });
   // スキル分類の修正（追加・削除は即保存して表示を更新）
   box.querySelectorAll(".cedit").forEach((ed) => {
@@ -269,11 +288,11 @@ function wireEdit(item, c) {
     fillCatSelect(sel);
     const saveCats = () => {
       const ov = loadDbOv();
-      const o = ov[c.n + "|" + c.r] || {};
+      const o = ov[ovKey] || {};
       o[key] = c[key] || [];
-      ov[c.n + "|" + c.r] = o;
+      ov[ovKey] = o;
       localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
-      c.ov = 1;
+      c.cedit = 1;
       box.innerHTML = detailHTML(c);  // 分類表示とチップを描き直す
       wireEdit(item, c);
     };
