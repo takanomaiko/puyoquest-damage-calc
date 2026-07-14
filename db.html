@@ -69,6 +69,24 @@
   .chip .chipx { cursor: pointer; color: #c0392b; font-size: 13px; }
   .cedit .catsel { font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 7px; max-width: 11em; }
   .cedit .catadd { font-size: 11px; padding: 4px 9px; border: none; border-radius: 7px; background: var(--grad); color: #fff; font-weight: 600; cursor: pointer; }
+  /* カード修正ポップアップ */
+  #editModal {
+    position: fixed; inset: 0; background: rgba(22, 28, 52, .5);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    display: none; align-items: flex-start; justify-content: center; padding: 7vh 12px 12px; z-index: 100;
+  }
+  #editModal.open { display: flex; }
+  @keyframes modalPop { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+  #editModal .ebox {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 480px; max-height: 80vh;
+    overflow-y: auto; padding: 16px;
+    box-shadow: 0 24px 70px -24px rgba(20, 30, 80, .5); animation: modalPop .18s ease;
+  }
+  #editModalHead { display: flex; gap: 10px; align-items: center; font-size: 14px; font-weight: 700; }
+  #editModalHead img { width: 52px; height: 52px; object-fit: contain; border-radius: 8px; flex: none; }
+  .mfoot { text-align: right; margin: 12px 0 0; }
+  #editClose { font-size: 13px; padding: 7px 16px; border: none; border-radius: 9px; background: var(--grad); color: #fff; font-weight: 600; cursor: pointer; }
+  .eopen { font-size: 12px; padding: 6px 12px; border: none; border-radius: 8px; background: var(--grad); color: #fff; font-weight: 600; cursor: pointer; }
   #moreBtn {
     display: block; width: 100%; padding: 12px; margin: 8px 0 20px; background: var(--grad); color: #fff;
     border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
@@ -115,6 +133,15 @@
   <p class="dl">表計算ソフト用: <a href="carddb.csv" download>carddb.csv をダウンロード</a><br>
   （Googleスプレッドシートの「ファイル→インポート」で開けます）</p>
 </main>
+
+<!-- カード修正ポップアップ（ステータス・スキル分類） -->
+<div id="editModal">
+  <div class="ebox">
+    <div id="editModalHead"></div>
+    <div id="editModalBody"></div>
+    <p class="mfoot"><button id="editClose">閉じる</button></p>
+  </div>
+</div>
 
 <script src="carddb.js"></script>
 <script>
@@ -209,9 +236,20 @@ function detailHTML(c) {
   if (c.ts) secs.push(`<div class="lbl sub">とくもり</div><div>${c.ts}</div>`);
   if (c.ab) secs.push(`<div class="lbl sub">アビリティ</div><div>${c.ab}</div>`);
   if (c.ga) secs.push(`<div class="lbl sub">きらめきオーラ</div><div>${c.ga}</div>`);
-  // ステータス修正フォーム（保存はこのブラウザ内だけ・計算機の検索にも反映）
-  secs.push(
-    `<div class="lbl sub">ステータス修正 ✏️</div>` +
+  // 修正はポップアップで行う（図鑑側はボタンだけ）
+  secs.push(`<div class="editrow"><button class="eopen">✏️ このカードを修正</button></div>`);
+  return secs.join("") || "詳細データなし";
+}
+
+// 詳細内の「このカードを修正」ボタン → ポップアップを開く
+function wireEdit(item, c) {
+  item.querySelector(".eopen").addEventListener("click", () => openEditModal(c));
+}
+
+// ---------- カード修正ポップアップ ----------
+function editModalHTML(c) {
+  let h =
+    `<div class="lbl sub">ステータス修正</div>` +
     `<div class="editrow">` +
     `攻撃 <input type="number" class="ea" value="${c.a ?? ""}"> ` +
     `体力 <input type="number" class="eh" value="${c.h ?? ""}"> ` +
@@ -219,8 +257,8 @@ function detailHTML(c) {
     `<button class="esave">保存</button>` +
     (c.edited ? ` <button class="ereset">ステータスを元に戻す</button>` : "") +
     `</div>` +
-    `<div class="edithint">このブラウザにだけ保存され、計算機の検索でも修正後の値が使われます。</div>`);
-  // スキル分類の修正フォーム（×で外す・プルダウンで追加、変更は即保存）
+    `<div class="edithint">このブラウザにだけ保存され、計算機の検索でも修正後の値が使われます。</div>`;
+  // スキル分類の修正（×で外す・プルダウンで追加、変更は即保存）
   const catEd = (key, label) =>
     `<div class="cedit" data-key="${key}"><span class="celabel">${label}</span>` +
     (c[key] || []).map((i) =>
@@ -232,17 +270,31 @@ function detailHTML(c) {
   if (c.fp) catSecs += catEd("fc", "フルパワー");
   if (c.wp) catSecs += catEd("wc", "ダブルパワー");
   if (catSecs) {
-    secs.push(`<div class="lbl sub">スキル分類の修正 ✏️</div>` + catSecs +
+    h += `<div class="lbl sub">スキル分類の修正</div>` + catSecs +
       (c.cedit ? `<div class="editrow"><button class="creset">分類を元に戻す</button></div>` : "") +
-      `<div class="edithint">×で外す・プルダウンから選んで追加。変更はすぐ保存されます。</div>`);
+      `<div class="edithint">×で外す・プルダウンから選んで追加。変更はすぐ保存されます。</div>`;
   }
-  return secs.join("") || "詳細データなし";
+  return h;
+}
+
+function openEditModal(c) {
+  $("#editModalHead").innerHTML =
+    (c.u ? `<img src="${c.u}" alt="">` : "") +
+    `<div>★${c.r} ${c.n} を修正</div>`;
+  $("#editModalBody").innerHTML = editModalHTML(c);
+  wireEditModal(c);
+  $("#editModal").classList.add("open");
 }
 
 // 修正フォームの保存・リセットのボタンを動かす
-function wireEdit(item, c) {
-  const box = item.querySelector(".ibody");
+function wireEditModal(c) {
+  const box = $("#editModalBody");
   const ovKey = c.n + "|" + c.r;
+  // フォームを描き直す（保存・変更のあと用）
+  const rerender = () => {
+    box.innerHTML = editModalHTML(c);
+    wireEditModal(c);
+  };
   // 修正データの中身が空になったらエントリごと消す共通処理
   const saveOv = (ov, o) => {
     const hasStats = o.a != null || o.h != null || o.c != null;
@@ -261,7 +313,9 @@ function wireEdit(item, c) {
     if (o.c != null) c.c = o.c;
     delete c.x;
     c.edited = 1;
-    refresh();  // 一覧の表示を新しい値に更新
+    refresh();   // うしろの一覧の表示も新しい値に更新
+    rerender();
+    alert("保存しました");
   });
   const resetBtn = box.querySelector(".ereset");
   if (resetBtn) resetBtn.addEventListener("click", () => {
@@ -293,8 +347,7 @@ function wireEdit(item, c) {
       ov[ovKey] = o;
       localStorage.setItem(DB_OV_KEY, JSON.stringify(ov));
       c.cedit = 1;
-      box.innerHTML = detailHTML(c);  // 分類表示とチップを描き直す
-      wireEdit(item, c);
+      rerender();
     };
     ed.querySelector(".catadd").addEventListener("click", () => {
       if (sel.value === "") return;
@@ -310,6 +363,18 @@ function wireEdit(item, c) {
     }));
   });
 }
+
+// ポップアップを閉じる（閉じたら一覧と詳細を最新の内容に描き直す）
+$("#editClose").addEventListener("click", () => {
+  $("#editModal").classList.remove("open");
+  refresh();
+});
+$("#editModal").addEventListener("click", (e) => {
+  if (e.target.id === "editModal") {
+    $("#editModal").classList.remove("open");
+    refresh();
+  }
+});
 
 function renderMore() {
   const list = $("#list");
