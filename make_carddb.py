@@ -392,9 +392,12 @@ def main():
                 fe = {"v": fv, "r": fr, "k": fk, "t": text}
                 if kind == "LS":
                     fe["o"] = "LS"
-                cats = cat_ids(dai, syo, text)  # スキル分類ID（倍率行に表示）
-                if cats:
-                    fe["c"] = cats
+                # ゲーム内スキル分類はスキル/フルパワー/ダブルパワーだけに適用される
+                # （リーダースキル・とくもり・アビリティ由来の行には付けない）
+                if kind == "NS":
+                    cats = cat_ids(dai, syo, text)
+                    if cats:
+                        fe["c"] = cats
                 sk.append(fe)
         if dai == "モード効果" and syo in MODE_MAP:
             mv, mr = MODE_MAP[syo]
@@ -405,9 +408,10 @@ def main():
                     me["o"] = "LS"
                 if syo == "ルーワどきどきモード":
                     me["s3"] = 1  # 副属性等倍化＝副属性セルに3倍の値を入れる印
-                cats = cat_ids(dai, syo, text)
-                if cats:
-                    me["c"] = cats
+                if kind == "NS":  # 分類はスキル/フルパワー/ダブルパワー由来のみ
+                    cats = cat_ids(dai, syo, text)
+                    if cats:
+                        me["c"] = cats
                 sk.append(me)
 
         if name_map:
@@ -458,9 +462,10 @@ def main():
                             se["pa"] = 1
                         if s3:
                             se["s3"] = 1
-                        cats = cat_ids(dai, syo, text)
-                        if cats:
-                            se["c"] = cats
+                        if kind == "NS":  # 分類はスキル/フルパワー/ダブルパワー由来のみ
+                            cats = cat_ids(dai, syo, text)
+                            if cats:
+                                se["c"] = cats
                         sk.append(se)
             except ValueError:
                 pass
@@ -592,12 +597,17 @@ def main():
                     else:
                         s["r"] = "両隣のみ"          # 自身を含まない
             # Wiki由来の倍率スキルにも行の名前から分類IDを付ける
+            # （ゲーム内分類はスキル/フルパワー/ダブルパワーのみ。
+            #   とくもり(特盛)・ブーストエリア・きらめきオーラ由来には付けない）
             for s in entry.get("sk", []):
+                k = s.get("k", "")
+                if "特盛" in k or "ブーストエリア" in k or "きらめきオーラ" in k or s.get("o") == "LS":
+                    continue
                 for pat, cat in (("攻撃エンハ", "攻撃力アップ"), ("同時攻撃", "条件達成で攻撃力アップ"),
                                  ("属性を含む", "条件達成で攻撃力アップ"), ("連鎖以上", "条件達成で攻撃力アップ"),
                                  ("与ダメ", "相手に与えるダメージアップ"), ("被ダメ", "相手が受けるダメージアップ"),
                                  ("盾破壊", "属性盾弱体化")):
-                    if pat in s.get("k", ""):
+                    if pat in k:
                         s["c"] = [CAT_ID[cat]]
                         break
             entries[(card["n"] + "@nexus", card["r"])] = entry
