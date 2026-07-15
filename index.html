@@ -668,8 +668,11 @@ function applySkillRows(slot, c) {
   for (const s of c.sk || []) {
     // リーダースキル由来の倍率は、リーダー/サポートに置いたときだけ行追加する
     if (s.o === "LS" && slot !== 0 && slot !== 5) continue;
+    // 行の名前はゲーム内スキル検索の分類名で統一（分類がないものはシートの名前のまま）
+    const rowName = (s.c && s.c.length && typeof SKILL_CATS !== "undefined")
+      ? s.c.map((i) => SKILL_CATS[i]).join("、") : s.k;
     state.rows.push({
-      name: s.k,
+      name: rowName,
       on: true,
       auto: slot,
       sk: { v: s.v, r: s.r || "", fv: s.fv, c: s.c, pa: s.pa, s3: s.s3 },
@@ -1334,9 +1337,9 @@ function renderMultTable() {
       });
       tdName.appendChild(skillBtn);
     }
-    // ゲーム内スキル検索の分類を行名の下に小さく表示
+    // ゲーム内スキル検索の分類を行名の下に小さく表示（行名と同じときは出さない）
     const cats = rowCatNames(row);
-    if (cats.length) {
+    if (cats.length && cats.join("、") !== row.name) {
       const catDiv = document.createElement("div");
       catDiv.className = "rowcats";
       catDiv.textContent = cats.join("、");
